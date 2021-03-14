@@ -27,7 +27,7 @@ import SmoothedValue
 import ConfusionMatrix
 
 MODEL_NAME = 'fcn_resnet101'
-model = torchvision.models.segmentation.__dict__['fcn_resnet101'](num_classes=21, pretrained=True)
+model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, pretrained=True)
 
 def cat_list(images, fill_value=0):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
