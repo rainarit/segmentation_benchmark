@@ -21,12 +21,14 @@ from PIL import Image
 import random
 import errno
 import os
+import pathlib
 
-import MetricLogger
-import SmoothedValue
-import ConfusionMatrix
+from MetricLogger import MetricLogger
+from SmoothedValue import SmoothedValue
+from ConfusionMatrix import ConfusionMatrix
 
 MODEL_NAME = 'fcn_resnet101'
+print('Downloading ', MODEL_NAME, ' ')
 model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, pretrained=True)
 
 def cat_list(images, fill_value=0):
@@ -208,7 +210,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
 
 device = torch.device('cuda')
-dataset_test = torchvision.datasets.VOCSegmentation(root='/content', year='2012', image_set="val", transforms=get_transform(train=False), download=True)
+dataset_test = torchvision.datasets.VOCSegmentation(root=str(pathlib.Path().absolute()), year='2012', image_set="val", transforms=get_transform(train=False), download=True)
 test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 data_loader_test = torch.utils.data.DataLoader(
     dataset_test, batch_size=32,
