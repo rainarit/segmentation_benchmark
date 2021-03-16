@@ -10,6 +10,7 @@ from torchvision.transforms import functional as F
 import torch.utils.data
 from torch import nn
 import torchvision
+import torchbench
 from torchbench.semantic_segmentation.transforms import (
     Normalize,
     Resize,
@@ -209,7 +210,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
 
-device = torch.device('cuda')
+device = torch.device('cpu')
 dataset_test = torchvision.datasets.VOCSegmentation(root=str(pathlib.Path().absolute()), year='2012', image_set="val", transforms=get_transform(train=False), download=True)
 test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 data_loader_test = torch.utils.data.DataLoader(
