@@ -21,6 +21,6 @@ pip install -r requirements.txt
 
 ## How to Run:
 ```bash
-python3 torchbench_PASCALVOC.py --model [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]
+python3 bench_PASCALVOC.py --model [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]
 ```
 
