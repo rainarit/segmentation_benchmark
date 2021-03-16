@@ -27,8 +27,15 @@ import pathlib
 from MetricLogger import MetricLogger
 from SmoothedValue import SmoothedValue
 from ConfusionMatrix import ConfusionMatrix
+import argparse
 
-MODEL_NAME = 'fcn_resnet101'
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='fcn_resnet101', help='Choose from following models : [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]')
+args = parser.parse_args()
+
+
+
+MODEL_NAME = args.model
 print('Downloading ', MODEL_NAME, ' ')
 model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, pretrained=True)
 
