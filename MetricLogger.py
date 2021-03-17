@@ -5,17 +5,11 @@ import math
 import time
 import torch
 import torch.distributed as dist
+import torch.utils.data
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
-import torch.utils.data
-from torch import nn
 import torchvision
-from torchbench.semantic_segmentation.transforms import (
-    Normalize,
-    Resize,
-    ToTensor,
-    Compose,
-)
+from torch import nn
 import numpy as np
 from PIL import Image
 import random
