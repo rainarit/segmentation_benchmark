@@ -23,21 +23,16 @@ import random
 import errno
 import os
 import pathlib
+import argparse
 
 from MetricLogger import MetricLogger
 from SmoothedValue import SmoothedValue
 from ConfusionMatrix import ConfusionMatrix
-import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default='fcn_resnet101', help='Choose from following models : [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]')
+parser.add_argument('--pretrained', type=bool, default=true, help='Choose from following : [true, false]')
 args = parser.parse_args()
-
-
-
-MODEL_NAME = args.model
-print('Downloading ', MODEL_NAME, ' ')
-model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, pretrained=True)
 
 def cat_list(images, fill_value=0):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
@@ -53,15 +48,6 @@ def collate_fn(batch):
     batched_imgs = cat_list(images, fill_value=0)
     batched_targets = cat_list(targets, fill_value=255)
     return batched_imgs, batched_targets
-
-
-def mkdir(path):
-    try:
-        os.makedirs(path)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-
 
 def setup_for_distributed(is_master):
     """
@@ -216,6 +202,11 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
+
+MODEL_NAME = args.model
+print('Downloading ', MODEL_NAME)
+model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, pretrained=True)
+print('Downloaded ', MODEL_NAME)
 
 device = torch.device('cpu')
 dataset_test = torchvision.datasets.VOCSegmentation(root=str(pathlib.Path().absolute()), year='2012', image_set="val", transforms=get_transform(train=False), download=True)
