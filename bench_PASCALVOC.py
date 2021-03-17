@@ -34,112 +34,6 @@ parser.add_argument('--model', type=str, default='fcn_resnet101', help='Choose f
 parser.add_argument('--pretrained', type=bool, default=true, help='Choose from following : [true, false]')
 args = parser.parse_args()
 
-def cat_list(images, fill_value=0):
-    max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
-    batch_shape = (len(images),) + max_size
-    batched_imgs = images[0].new(*batch_shape).fill_(fill_value)
-    for img, pad_img in zip(images, batched_imgs):
-        pad_img[..., :img.shape[-2], :img.shape[-1]].copy_(img)
-    return batched_imgs
-
-
-def collate_fn(batch):
-    images, targets = list(zip(*batch))
-    batched_imgs = cat_list(images, fill_value=0)
-    batched_targets = cat_list(targets, fill_value=255)
-    return batched_imgs, batched_targets
-
-def setup_for_distributed(is_master):
-    """
-    This function disables printing when not in master process
-    """
-    import builtins as __builtin__
-    builtin_print = __builtin__.print
-
-    def print(*args, **kwargs):
-        force = kwargs.pop('force', False)
-        if is_master or force:
-            builtin_print(*args, **kwargs)
-
-    __builtin__.print = print
-
-
-def is_dist_avail_and_initialized():
-    if not dist.is_available():
-        return False
-    if not dist.is_initialized():
-        return False
-    return True
-
-
-def get_world_size():
-    if not is_dist_avail_and_initialized():
-        return 1
-    return dist.get_world_size()
-
-
-def get_rank():
-    if not is_dist_avail_and_initialized():
-        return 0
-    return dist.get_rank()
-
-
-def is_main_process():
-    return get_rank() == 0
-
-
-def save_on_master(*args, **kwargs):
-    if is_main_process():
-        torch.save(*args, **kwargs)
-
-
-def init_distributed_mode(args):
-    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        args.rank = int(os.environ["RANK"])
-        args.world_size = int(os.environ['WORLD_SIZE'])
-        args.gpu = int(os.environ['LOCAL_RANK'])
-    elif 'SLURM_PROCID' in os.environ:
-        args.rank = int(os.environ['SLURM_PROCID'])
-        args.gpu = args.rank % torch.cuda.device_count()
-    elif hasattr(args, "rank"):
-        pass
-    else:
-        print('Not using distributed mode')
-        args.distributed = False
-        return
-
-    args.distributed = True
-
-    torch.cuda.set_device(args.gpu)
-    args.dist_backend = 'nccl'
-    print('| distributed init (rank {}): {}'.format(
-        args.rank, args.dist_url), flush=True)
-    torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                                         world_size=args.world_size, rank=args.rank)
-    setup_for_distributed(args.rank == 0)
-
-def pad_if_smaller(img, size, fill=0):
-    min_size = min(img.size)
-    if min_size < size:
-        ow, oh = img.size
-        padh = size - oh if oh < size else 0
-        padw = size - ow if ow < size else 0
-        img = F.pad(img, (0, 0, padw, padh), fill=fill)
-    return img
-
-def get_dataset(name, image_set, transform):
-    def sbd(*args, **kwargs):
-        return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
-    paths = {
-        "voc": ('./.data/', torchvision.datasets.VOCSegmentation, 21),
-        "voc_aug": ('/datasets01/SBDD/072318/', sbd, 21),
-    }
-    p, ds_fn, num_classes = paths[name]
-
-    ds = ds_fn(p, image_set=image_set, transforms=transform)
-    return ds, num_classes
-
-
 def get_transform(train):
     base_size = 520
     crop_size = 480
@@ -201,7 +95,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         lr_scheduler.step()
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
-
 
 MODEL_NAME = args.model
 print('Downloading ', MODEL_NAME)
