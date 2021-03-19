@@ -1,5 +1,5 @@
 # Image Segmentation Benchmark
-## Installation
+## Prerequisites
 Install all needed packages/libraries
 ```bash
 pip install -r requirements.txt
