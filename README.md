@@ -37,3 +37,7 @@ python3 bench_PASCALVOC.py --model [fcn_resnet50, fcn_resnet101, deeplabv3_resne
 | DeepLabV3 MobileNet V3 Large | are neat |    $1           | -----:|
 | LRASPP MobileNet V3 Large    | are neat |    $1           | -----:|
 
+
+## License ![GitHub](https://img.shields.io/github/license/rainarit/segmentation-benchmark)
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE.md](https://github.com/ainarit/segmentation-benchmark/blob/master/LICENSE) file for details
