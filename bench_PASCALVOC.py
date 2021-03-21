@@ -50,7 +50,7 @@ if __name__ == '__main__':
         max_size = int(2.0 * base_size)
 
         transforms = []
-        transforms.append(T.RandomResize(min_size, max_size))
+        transforms.append(T.Resize(min_size, max_size))
         if hflip_prob > 0:
             transforms.append(T.RandomHorizontalFlip(hflip_prob))
         transforms.append(T.RandomCrop(crop_size))
@@ -58,9 +58,9 @@ if __name__ == '__main__':
         transforms.append(T.Normalize(mean=mean, std=std))
         return T.Compose(transforms)
 
-    def get_transform_eval(base_size=520, crop_size=480, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    def get_transform_eval(base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         transforms = []
-        transforms.append(T.RandomResize((base_size, crop_size)))
+        transforms.append(T.RandomResize(base_size, base_size))
         transforms.append(T.ToTensor())
         transforms.append(T.Normalize(mean=[0.485, 0.456, 0.406],
                                   std=[0.229, 0.224, 0.225]))
@@ -70,8 +70,26 @@ if __name__ == '__main__':
         base_size = 520
         crop_size = 480
 
-        return get_transform_train(base_size, crop_size) if train else get_transform_eval(base_size, crop_size)
+        min_size = int((0.5 if train else 1.0) * base_size)
+        max_size = int((2.0 if train else 1.0) * base_size)
 
+        return get_transform_train(base_size, crop_size) if train else get_transform_eval(base_size)
+
+    def cat_list(images, fill_value=0):
+        max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
+        batch_shape = (len(images),) + max_size
+        batched_imgs = images[0].new(*batch_shape).fill_(fill_value)
+        for img, pad_img in zip(images, batched_imgs):
+            pad_img[..., :img.shape[-2], :img.shape[-1]].copy_(img)
+        return batched_imgs
+
+
+    def collate_fn(batch):
+        images, targets = list(zip(*batch))
+        batched_imgs = cat_list(images, fill_value=0)
+        batched_targets = cat_list(targets, fill_value=255)
+        return batched_imgs, batched_targets
+    
     def evaluate(model, data_loader, device, num_classes):
         print("---------------------Setting model to evaluation mode")
         model.eval()
@@ -98,7 +116,7 @@ if __name__ == '__main__':
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     # Downloading PASCAL VOC 2012 Validation Set
-    dataset_test = torchvision.datasets.VOCSegmentation(root=str(dir_path), 
+    dataset_val = torchvision.datasets.VOCSegmentation(root=str(dir_path), 
                                                         year='2012', 
                                                         image_set="val", 
                                                         transforms=get_transform(train=False), 
@@ -108,18 +126,19 @@ if __name__ == '__main__':
 
     print("------------------------------------------------------------------------------------")
 
-    test_sampler = torch.utils.data.SequentialSampler(dataset_test)
+    val_sampler = torch.utils.data.SequentialSampler(dataset_val)
 
-    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
-                                                   batch_size=32, 
-                                                   sampler=test_sampler, 
-                                                   num_workers=4)
+    data_loader_val = torch.utils.data.DataLoader(dataset_val, 
+                                                  batch_size=32,
+                                                  sampler=val_sampler, 
+                                                  num_workers=4,
+                                                  collate_fn=collate_fn)
     
     model.to(device)
 
     print("Evaluating Model on Validation Set")
 
-    confmat = evaluate(model, data_loader_test, device=device, num_classes=21)
+    confmat = evaluate(model, data_loader_val, device=device, num_classes=21)
 
     confmat.compute()
     print(confmat)
