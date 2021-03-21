@@ -9,16 +9,10 @@ import os
 import numpy as np
 from PIL import Image
 import random
-from torchvision import transforms as T
 import datetime
 import torch
 import torch.utils.data
-from torchbench.semantic_segmentation.transforms import (
-    Normalize,
-    Resize,
-    ToTensor,
-    Compose,
-)
+import transforms as T
 import argparse
 from tqdm import tqdm
 
@@ -51,18 +45,32 @@ if __name__ == '__main__':
     print("------------------------------------------------------------------------------------")
 
     # Inspiration from PyTorch’s GitHub repository on image segmentation transformation
+    def get_transform_train(base_size, crop_size, hflip_prob=0.5, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+        min_size = int(0.5 * base_size)
+        max_size = int(2.0 * base_size)
+
+        transforms = []
+        transforms.append(T.RandomResize(min_size, max_size))
+        if hflip_prob > 0:
+            transforms.append(T.RandomHorizontalFlip(hflip_prob))
+        transforms.append(T.RandomCrop(crop_size))
+        transforms.append(T.ToTensor())
+        transforms.append(T.Normalize(mean=mean, std=std))
+        return T.Compose(transforms)
+
+    def get_transform_eval(base_size=520, crop_size=480, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+        transforms = []
+        transforms.append(T.Resize((base_size, crop_size)))
+        transforms.append(T.ToTensor())
+        transforms.append(T.Normalize(mean=[0.485, 0.456, 0.406],
+                                  std=[0.229, 0.224, 0.225]))
+        return T.Compose(transforms)
+
     def get_transform(train):
         base_size = 520
         crop_size = 480
 
-        min_size = int((0.5 if train else 1.0) * base_size)
-        max_size = int((2.0 if train else 1.0) * base_size)
-        transforms = []
-        transforms.append(Resize((520, 480)))
-        transforms.append(ToTensor())
-        transforms.append(Normalize(mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225]))
-        return Compose(transforms)
+        return get_transform_train(base_size, crop_size) if train else get_transform_eval(base_size, crop_size)
 
     def evaluate(model, data_loader, device, num_classes):
         print("---------------------Setting model to evaluation mode")
