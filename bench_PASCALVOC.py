@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     def get_transform_eval(base_size=520, crop_size=480, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         transforms = []
-        transforms.append(T.Resize((base_size, crop_size)))
+        transforms.append(T.RandomResize((base_size, crop_size)))
         transforms.append(T.ToTensor())
         transforms.append(T.Normalize(mean=[0.485, 0.456, 0.406],
                                   std=[0.229, 0.224, 0.225]))
