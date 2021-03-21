@@ -6,7 +6,6 @@ import torch
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
 
-
 def pad_if_smaller(img, size, fill=0):
     min_size = min(img.size)
     if min_size < size:
@@ -37,7 +36,7 @@ class RandomResize(object):
     def __call__(self, image, target):
         size = random.randint(self.min_size, self.max_size)
         image = F.resize(image, size)
-        target = F.resize(target, size, interpolation=F.InterpolationMode.NEAREST)
+        target = F.resize(target, size, interpolation=Image.NEAREST)
         return image, target
 
 

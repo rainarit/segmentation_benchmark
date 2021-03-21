@@ -67,8 +67,8 @@ if __name__ == '__main__':
         return T.Compose(transforms)
 
     def get_transform(train):
-        base_size = 520
-        crop_size = 480
+        base_size = 390
+        crop_size = 360
 
         min_size = int((0.5 if train else 1.0) * base_size)
         max_size = int((2.0 if train else 1.0) * base_size)
