@@ -1,107 +1,110 @@
 from __future__ import print_function
+import torchvision
 from collections import defaultdict, deque
-import datetime
 import math
 import time
-import torch
 import torch.distributed as dist
-import torch.utils.data
-from torchvision import transforms as T
-from torchvision.transforms import functional as F
-import torchvision
-from torch import nn
+import errno
+import os
 import numpy as np
 from PIL import Image
 import random
-import errno
-import os
-import pathlib
+from torchvision import transforms as T
+import datetime
+import torch
+import torch.utils.data
+from torchbench.semantic_segmentation.transforms import (
+    Normalize,
+    Resize,
+    ToTensor,
+    Compose,
+)
+import argparse
 
-from MetricLogger import MetricLogger
-from SmoothedValue import SmoothedValue
-from ConfusionMatrix import ConfusionMatrix
+import MetricLogger, ConfusionMatrix, SmoothedValue
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='fcn_resnet101', help='Choose from following models : [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]')
-parser.add_argument('--pretrained', type=bool, default=true, help='Choose from following : [true, false]')
-args = parser.parse_args()
+parser.add_argument('--model', type=str, default='fcn_resnet101', help='Select model from [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]')
+parser.add_argument('--pretrained', type=bool, default=True, help='Select pretraining module from [True, False]')
 
-def get_transform(train):
-    base_size = 520
-    crop_size = 480
-
-    min_size = int((0.5 if train else 1.0) * base_size)
-    max_size = int((2.0 if train else 1.0) * base_size)
-    transforms = []
-    transforms.append(Resize((520, 480)))
-    transforms.append(ToTensor())
-    transforms.append(Normalize(mean=[0.485, 0.456, 0.406],
-                                  std=[0.229, 0.224, 0.225]))
-    return Compose(transforms)
+if __name__ == '__main__':
+    args = parser.parse_args()
+    args.cuda = torch.cuda.is_available()
     
+    MODEL_NAME = args.model
+    pretrained = args.pretrained
+    print("Selected Model:", MODEL_NAME)
+    print("Selected Pre-trained = True" if pretrained else "Selected Pre-trained = False")
+    print("------------------------------------------------------------------------------------")
 
+    model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, 
+                                                                 pretrained=pretrained)
 
-def criterion(inputs, target):
-    losses = {}
-    for name, x in inputs.items():
-        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
+    print("Downloaded", MODEL_NAME, "successfully!")
 
-    if len(losses) == 1:
-        return losses['out']
+    print("------------------------------------------------------------------------------------")
 
-    return losses['out'] + 0.5 * losses['aux']
+    # Inspiration from PyTorch’s GitHub repository on image segmentation transformation
+    def get_transform(train):
+        base_size = 520
+        crop_size = 480
 
+        min_size = int((0.5 if train else 1.0) * base_size)
+        max_size = int((2.0 if train else 1.0) * base_size)
+        transforms = []
+        transforms.append(Resize((520, 480)))
+        transforms.append(ToTensor())
+        transforms.append(Normalize(mean=[0.485, 0.456, 0.406],
+                                    std=[0.229, 0.224, 0.225]))
+        return Compose(transforms)
 
-def evaluate(model, data_loader, device, num_classes):
-    model.eval()
-    confmat = ConfusionMatrix(num_classes)
-    metric_logger = MetricLogger(delimiter="  ")
-    header = 'Test:'
-    with torch.no_grad():
-        for image, target in metric_logger.log_every(data_loader, 100, header):
-            image, target = image.to(device), target.to(device)
-            output = model(image)
-            output = output['out']
+    def evaluate(model, data_loader, device, num_classes):
+        print("                     Setting model to evaluation mode")
+        model.eval()
+        confmat = ConfusionMatrix(num_classes)
+        metric_logger = MetricLogger(delimiter="  ")
+        header = 'Test:'
+        with torch.no_grad():
+            for image, target in metric_logger.log_every(data_loader, 100, header):
+                image, target = image.to(device), target.to(device)
+                output = model(image)
+                output = output['out']
 
-            confmat.update(target.flatten(), output.argmax(1).flatten())
+                confmat.update(target.flatten(), output.argmax(1).flatten())
 
-        confmat.reduce_from_all_processes()
+            confmat.reduce_from_all_processes()
 
-    return confmat
+        return confmat
+    
+    torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    print("Downloading PASCAL VOC 2012 Validation Set")
 
-def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
-    model.train()
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
-    header = 'Epoch: [{}]'.format(epoch)
-    for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        image, target = image.to(device), target.to(device)
-        output = model(image)
-        loss = criterion(output, target)
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    # Downloading PASCAL VOC 2012 Validation Set
+    dataset_test = torchvision.datasets.VOCSegmentation(root=str(dir_path), 
+                                                        year='2012', 
+                                                        image_set="val", 
+                                                        transforms=get_transform(train=False), 
+                                                        download=True)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    print("Downloaded PASCAL VOC 2012 Validation Set successfully!")
 
-        lr_scheduler.step()
+    print("------------------------------------------------------------------------------------")
 
-        metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+    test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-MODEL_NAME = args.model
-print('Downloading ', MODEL_NAME)
-model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, pretrained=True)
-print('Downloaded ', MODEL_NAME)
+    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
+                                                   batch_size=32, 
+                                                   sampler=test_sampler, 
+                                                   num_workers=4)
+    
+    model.to(device)
 
-device = torch.device('cpu')
-dataset_test = torchvision.datasets.VOCSegmentation(root=str(pathlib.Path().absolute()), year='2012', image_set="val", transforms=get_transform(train=False), download=True)
-test_sampler = torch.utils.data.SequentialSampler(dataset_test)
-data_loader_test = torch.utils.data.DataLoader(
-    dataset_test, batch_size=32,
-    sampler=test_sampler, num_workers=4,
-    collate_fn=collate_fn)
-model.to(device)
-confmat = evaluate(model, data_loader_test, device=device, num_classes=21)
+    print("Evaluating Model on Validation Set")
 
-confmat.compute()
-print(confmat)
+    confmat = evaluate(model, data_loader_test, device=device, num_classes=21)
+
+    confmat.compute()
+    print(confmat)
+
