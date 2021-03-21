@@ -20,8 +20,14 @@ from torchbench.semantic_segmentation.transforms import (
     Compose,
 )
 import argparse
+from tqdm import tqdm
 
-import MetricLogger, ConfusionMatrix, SmoothedValue
+from MetricLogger import MetricLogger
+
+from ConfusionMatrix import ConfusionMatrix
+
+from SmoothedValue import SmoothedValue
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default='fcn_resnet101', help='Select model from [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]')
@@ -59,13 +65,15 @@ if __name__ == '__main__':
         return Compose(transforms)
 
     def evaluate(model, data_loader, device, num_classes):
-        print("                     Setting model to evaluation mode")
+        print("---------------------Setting model to evaluation mode")
         model.eval()
+        print("---------------------Generating Confusion Matrix")
         confmat = ConfusionMatrix(num_classes)
+        print("---------------------Generating MetricLogger")
         metric_logger = MetricLogger(delimiter="  ")
         header = 'Test:'
         with torch.no_grad():
-            for image, target in metric_logger.log_every(data_loader, 100, header):
+            for image, target in tqdm(metric_logger.log_every(data_loader, 100, header)):
                 image, target = image.to(device), target.to(device)
                 output = model(image)
                 output = output['out']
@@ -76,7 +84,7 @@ if __name__ == '__main__':
 
         return confmat
     
-    torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print("Downloading PASCAL VOC 2012 Validation Set")
 
