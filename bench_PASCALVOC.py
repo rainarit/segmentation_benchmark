@@ -131,7 +131,7 @@ if __name__ == '__main__':
     data_loader_val = torch.utils.data.DataLoader(dataset_val, 
                                                   batch_size=32,
                                                   sampler=val_sampler, 
-                                                  num_workers=4,
+                                                  num_workers=0,
                                                   collate_fn=collate_fn)
     
     model.to(device)
