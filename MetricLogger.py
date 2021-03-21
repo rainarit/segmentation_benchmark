@@ -11,6 +11,7 @@ from torchvision.transforms import functional as F
 import torchvision
 from torch import nn
 import numpy as np
+from tqdm import tqdm
 from PIL import Image
 import random
 import errno
@@ -83,7 +84,7 @@ class MetricLogger(object):
                 'data: {data}'
             ])
         MB = 1024.0 * 1024.0
-        for obj in iterable:
+        for obj in tqdm(iterable):
             data_time.update(time.time() - end)
             yield obj
             iter_time.update(time.time() - end)
