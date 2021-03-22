@@ -114,7 +114,9 @@ def main(args):
                                                   sampler=val_sampler, 
                                                   num_workers=WORKERS,
                                                   collate_fn=collate_fn)
+    
     model.to(DEVICE)
+
     print("Evaluating Model on Validation Set")
     confmat = evaluate(model, data_loader_val, device=DEVICE, num_classes=21)
     confmat.compute()
@@ -130,6 +132,12 @@ def parse_args():
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
+    parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
+    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
+                        help='momentum')
+    parser.add_argument('--weight_decay', default=1e-4, type=float,
+                        metavar='W', help='weight decay (default: 1e-4)',
+                        dest='weight_decay')
     args = parser.parse_args()
     return args
 
