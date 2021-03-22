@@ -42,7 +42,16 @@ class ConfusionMatrix(object):
         iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
         return acc_global, acc, iu
 
-    def overall_pixel_accuracy(hist):
+    def eval_metrics(self):
+        hist = self.mat
+        overall_accuracy = overall_pixel_accuracy(hist)
+        per_class_accuracy = per_class_pixel_accuracy(hist)
+        iou = jaccard_index(hist)
+        dice = dice_coefficient(hist)
+        return overall_accuracy, per_class_accuracy, iou, dice
+
+
+    def overall_pixel_accuracy(self, hist):
         """Computes the total pixel accuracy.
         The overall pixel accuracy provides an intuitive
         approximation for the qualitative perception of the
@@ -58,7 +67,7 @@ class ConfusionMatrix(object):
         overall_acc = correct / (total)
         return overall_acc
 
-    def per_class_pixel_accuracy(hist):
+    def per_class_pixel_accuracy(self, hist):
         """Computes the average per-class pixel accuracy.
         The per-class pixel accuracy is a more fine-grained
         version of the overall pixel accuracy. A model could
@@ -78,7 +87,7 @@ class ConfusionMatrix(object):
         avg_per_class_acc = nanmean(per_class_acc)
         return avg_per_class_acc
 
-    def jaccard_index(hist):
+    def jaccard_index(self, hist):
         """Computes the Jaccard index, a.k.a the Intersection over Union (IoU).
         Args:
             hist: confusion matrix.
@@ -92,7 +101,7 @@ class ConfusionMatrix(object):
         avg_jacc = nanmean(jaccard)
         return avg_jacc
 
-    def dice_coefficient(hist):
+    def dice_coefficient(self, hist):
         """Computes the Sørensen–Dice coefficient, a.k.a the F1 score.
         Args:
             hist: confusion matrix.
@@ -113,15 +122,33 @@ class ConfusionMatrix(object):
             return
         torch.distributed.barrier()
         torch.distributed.all_reduce(self.mat)
-
+    
     def __str__(self):
-        acc_global, acc, iu = self.compute()
+        acc_global, acc, iou, dice = self.eval_metrics()
         return (
-            'global correct: {:.1f}\n'
-            'average row correct: {}\n'
-            'IoU: {}\n'
-            'mean IoU: {:.1f}').format(
-                acc_global.item() * 100,
-                ['{:.1f}'.format(i) for i in (acc * 100).tolist()],
-                ['{:.1f}'.format(i) for i in (iu * 100).tolist()],
-                iu.mean().item() * 100)
+            'global pixel accuracy: {:.1f}\n'
+            'class pixel accuracy: {}\n'
+            'global IoU: {:.1f}\n'
+            'class IoU: {}\n'
+            'global dice coefficient: {:.1f}\n'
+            'class dice coefficient: {}\n'
+        ).format(
+            acc_global.item()*100,
+            ['{:.1f}'.format(i) for i in (acc * 100).tolist()],
+            iou.mean().item() * 100,
+            ['{:.1f}'.format(i) for i in (iou * 100).tolist()],
+            dice.mean().item() * 100,
+            ['{:.1f}'.format(i) for i in (dice * 100).tolist()]
+        )
+
+    #def __str__(self):
+    #    acc_global, acc, iu = self.compute()
+    #    return (
+    #        'global correct: {:.1f}\n'
+    #        'average row correct: {}\n'
+    #        'IoU: {}\n'
+    #        'mean IoU: {:.1f}').format(
+    #            acc_global.item() * 100,
+    #            ['{:.1f}'.format(i) for i in (acc * 100).tolist()],
+    #            ['{:.1f}'.format(i) for i in (iu * 100).tolist()],
+    #            iu.mean().item() * 100)
