@@ -1,4 +1,4 @@
-# Image Segmentation Benchmark
+# Image Segmentation Benchmark Documentation
 ## Prerequisites
 Install Git Repository
 ```bash
