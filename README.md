@@ -53,7 +53,8 @@ Evaluating Model on Validation Set
 ---------------------Setting model to evaluation mode
 ---------------------Generating Confusion Matrix
 ---------------------Generating MetricLogger
-  0%|                                                                                                                                                                                           | 0/91 [00:00<?, ?it/s]Test:  [ 0/91]  eta: 0:03:04    time: 2.0292  data: 1.4526  max mem: 776
+  0%|                                                                                                                                                                                  | 0/91 [00:00<?, ?it/s]
+Test:  [ 0/91]  eta: 0:03:04    time: 2.0292  data: 1.4526  max mem: 776
 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 91/91 [00:18<00:00,  4.90it/s]
 Test: Total time: 0:00:18
 global correct: 90.9
