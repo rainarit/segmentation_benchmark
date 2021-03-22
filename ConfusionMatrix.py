@@ -78,7 +78,6 @@ class ConfusionMatrix(object):
         avg_per_class_acc = nanmean(per_class_acc)
         return avg_per_class_acc
 
-
     def jaccard_index(hist):
         """Computes the Jaccard index, a.k.a the Intersection over Union (IoU).
         Args:
@@ -93,7 +92,6 @@ class ConfusionMatrix(object):
         avg_jacc = nanmean(jaccard)
         return avg_jacc
 
-
     def dice_coefficient(hist):
         """Computes the Sørensen–Dice coefficient, a.k.a the F1 score.
         Args:
@@ -107,7 +105,6 @@ class ConfusionMatrix(object):
         dice = (2 * A_inter_B) / (A + B)
         avg_dice = nanmean(dice)
         return avg_dice
-
 
     def reduce_from_all_processes(self):
         if not torch.distributed.is_available():
