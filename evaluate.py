@@ -39,8 +39,8 @@ def get_transform_eval(base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224,
     transforms = []
     transforms.append(T.RandomResize(base_size, base_size))
     transforms.append(T.ToTensor())
-    transforms.append(T.Normalize(mean=[0.485, 0.456, 0.406],
-                                  std=[0.229, 0.224, 0.225]))
+    transforms.append(T.Normalize(mean=mean,
+                                  std=std))
     return T.Compose(transforms)
 
 def get_transform(train):

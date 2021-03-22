@@ -32,7 +32,10 @@ def main(args):
     WORKERS = args.workers
 
     print("Selected Model:", MODEL_NAME)
-    print("Selected Pre-trained = True" if PRETRAINED else "Selected Pre-trained = False")
+    if PRETRAINED == True:
+        print("Selected Pre-trained = True")
+    else:
+        print("Selected Pre-trained = False")
     print("------------------------------------------------------------------------------------")
     model = torchvision.models.segmentation.__dict__[MODEL_NAME](num_classes=21, 
                                                                  pretrained=PRETRAINED)
