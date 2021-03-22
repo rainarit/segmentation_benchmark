@@ -16,12 +16,15 @@ import random
 import errno
 import os
 import pathlib
-from utils import nanmean
 
 class ConfusionMatrix(object):
     def __init__(self, num_classes):
         self.num_classes = num_classes
         self.mat = None
+
+    def nanmean(self, x):
+        """Computes the arithmetic mean ignoring any NaNs."""
+        return torch.mean(x[x == x])
 
     def update(self, a, b):
         n = self.num_classes

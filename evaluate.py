@@ -44,8 +44,8 @@ def get_transform_eval(base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224,
     return T.Compose(transforms)
 
 def get_transform(train):
-    base_size = 130
-    crop_size = 120
+    base_size = 520
+    crop_size = 480
 
     min_size = int((0.5 if train else 1.0) * base_size)
     max_size = int((2.0 if train else 1.0) * base_size)
