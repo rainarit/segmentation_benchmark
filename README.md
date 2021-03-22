@@ -35,6 +35,25 @@ python3 bench_PASCALVOC.py --model fcn_resnet101 \
                            --device 'cuda' \
                            --batch_size 4 \
                            --workers 4
+Selected Model: fcn_resnet101
+Selected Pre-trained = True
+------------------------------------------------------------------------------------
+Downloaded fcn_resnet101 successfully!
+------------------------------------------------------------------------------------
+Downloading PASCAL VOC 2012 Validation Set
+Downloaded PASCAL VOC 2012 Validation Set successfully!
+------------------------------------------------------------------------------------
+Evaluating Model on Validation Set
+---------------------Setting model to evaluation mode
+---------------------Generating Confusion Matrix
+---------------------Generating MetricLogger
+  0%|                                                         | 0/91 [00:00<?, ?it/s]Test:  [ 0/91]  eta: 0:02:58    time: 1.9572  data: 1.3820  max mem: 776
+100%|████████████████████████████████████████████████| 91/91 [00:19<00:00,  4.77it/s]
+Test: Total time: 0:00:19
+global correct: 90.7
+average row correct: ['97.2', '79.5', '69.0', '79.3', '66.7', '72.6', '84.1', '77.6', '77.0', '40.0', '82.7', '39.0', '73.5', '82.9', '75.7', '82.6', '65.8', '80.4', '35.3', '76.3', '59.5']
+IoU: ['89.8', '72.9', '31.9', '70.4', '59.7', '67.7', '82.3', '71.9', '71.2', '32.4', '77.8', '37.6', '63.0', '74.0', '62.8', '72.9', '55.7', '70.9', '31.8', '72.5', '54.7']
+mean IoU: 63.1
 ```
 
 ## Results:
