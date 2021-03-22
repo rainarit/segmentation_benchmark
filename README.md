@@ -20,12 +20,21 @@ pip install -r requirements.txt
            
 
 ## How to Run:
+### Generic Experiment:
 ```bash
 python3 bench_PASCALVOC.py --model \
                            --pretrained \
                            --device \
                            --batch_size \
                            --workers \
+```
+### FCN-ResNet101 Example:
+```bash
+python3 bench_PASCALVOC.py --model fcn_resnet101 \
+                           --pretrained True \
+                           --device 'cuda' \
+                           --batch_size 4 \
+                           --workers 4
 ```
 
 ## Results:
