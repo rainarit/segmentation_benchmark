@@ -1,5 +1,11 @@
 # Image Segmentation Benchmark
 ## Prerequisites
+Install Git Repository
+```bash
+git clone https://github.com/rainarit/segmentation-benchmark.git
+cd segmentation-benchmark
+```
+
 Install all needed packages/libraries
 ```bash
 pip install -r requirements.txt
