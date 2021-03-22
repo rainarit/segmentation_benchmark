@@ -105,7 +105,7 @@ def main(args):
                                                         year='2012', 
                                                         image_set="val", 
                                                         transforms=get_transform(train=False), 
-                                                        download=True)
+                                                        download=False)
     print("Downloaded PASCAL VOC 2012 Validation Set successfully!")
     print("------------------------------------------------------------------------------------")
     val_sampler = torch.utils.data.SequentialSampler(dataset_val)
@@ -118,7 +118,7 @@ def main(args):
     model.to(DEVICE)
 
     print("Evaluating Model on Validation Set")
-    confmat = evaluate(model, data_loader_val, device=DEVICE, num_classes=21)
+    confmat = evaluate(model, data_loader_val, device=DEVICE, num_classes=20)
     confmat.compute()
     print(confmat)
 
