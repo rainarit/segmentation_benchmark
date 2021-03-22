@@ -78,7 +78,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Image Segmentation Benchmark')
 
     parser.add_argument('--model', type=str, default='fcn_resnet101', help='Select model from [fcn_resnet50, fcn_resnet101, deeplabv3_resnet50, deeplabv3_resnet101, deeplabv3_mobilenet_v3_large, lraspp_mobilenet_v3_large]')
-    parser.add_argument('--pretrained', type=bool, default=True, help='Select pretraining module from [True, False]')
+    parser.add_argument('--pretrained', default=True, help='Select pretraining module from [True, False]')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--workers', default=4, type=int, metavar='N',
