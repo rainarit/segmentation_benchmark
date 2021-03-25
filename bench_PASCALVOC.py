@@ -15,6 +15,7 @@ import torch.utils.data
 import transforms as T
 import argparse
 from tqdm import tqdm
+import pickle
 
 from MetricLogger import MetricLogger
 from ConfusionMatrix import ConfusionMatrix
@@ -70,8 +71,10 @@ def main(args):
 
     print("Evaluating Model on Validation Set")
     confmat = evaluate(model, data_loader_val, device=DEVICE, num_classes=20)
-    confmat.compute()
-    print(confmat)
+    file = open('hist.txt', 'wb')
+    pickle.dump(confmat, file)
+    file.close()
+
 
 def parse_args():
     import argparse
