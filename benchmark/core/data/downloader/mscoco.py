@@ -11,15 +11,15 @@ sys.path.append(root_path)
 
 from core.utils import download, makedirs, try_import_pycocotools
 
-_TARGET_DIR = os.path.expanduser('~/.torch/datasets/coco')
+#_TARGET_DIR = os.path.expanduser('../datasets/coco')
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Initialize MS COCO dataset.',
-        epilog='Example: python mscoco.py --download-dir ~/mscoco',
+        epilog='Example: python mscoco.py --download-dir ../datasets/coco',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--download-dir', type=str, default='~/mscoco/', help='dataset directory on disk')
+    parser.add_argument('--download-dir', type=str, default='../datasets/coco', help='dataset directory on disk')
     parser.add_argument('--no-download', action='store_true', help='disable automatic download if set')
     parser.add_argument('--overwrite', action='store_true',
                         help='overwrite downloaded files if set, in case they are corrupted')
@@ -61,9 +61,9 @@ if __name__ == '__main__':
         else:
             download_coco(path, overwrite=args.overwrite)
 
-    # make symlink
-    makedirs(os.path.expanduser('~/.torch/datasets'))
-    if os.path.isdir(_TARGET_DIR):
-        os.remove(_TARGET_DIR)
-    os.symlink(path, _TARGET_DIR)
+    # # make symlink
+    # makedirs(os.path.expanduser('~/.torch/datasets'))
+    # if os.path.isdir(_TARGET_DIR):
+    #     os.remove(_TARGET_DIR)
+    # os.symlink(path, _TARGET_DIR)
     try_import_pycocotools()
