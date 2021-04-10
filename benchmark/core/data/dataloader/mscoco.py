@@ -65,6 +65,8 @@ class COCOSegmentation(SegmentationDataset):
             self.ids = self._preprocess(ids, ids_file)
         self.transform = transform
 
+        self.images = self.coco
+
     def __getitem__(self, index):
         coco = self.coco
         img_id = self.ids[index]
@@ -134,3 +136,6 @@ class COCOSegmentation(SegmentationDataset):
                 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse',
                 'motorcycle', 'person', 'potted-plant', 'sheep', 'sofa', 'train',
                 'tv')
+    
+    def __len__(self):
+        return len(self.images)
