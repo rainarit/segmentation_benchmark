@@ -40,7 +40,7 @@ def parse_args():
                                  'resnet101', 'resnet152', 'densenet121',
                                  'densenet161', 'densenet169', 'densenet201'],
                         help='backbone name (default: vgg16)')
-    parser.add_argument('--dataset', type=str, default='pascal_voc',
+    parser.add_argument('--dataset', type=str, default='coco',
                         choices=['pascal_voc', 'pascal_aug', 'ade20k',
                                  'citys', 'sbu'],
                         help='dataset name (default: pascal_voc)')

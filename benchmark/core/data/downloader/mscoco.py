@@ -17,9 +17,9 @@ from core.utils import download, makedirs, try_import_pycocotools
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Initialize MS COCO dataset.',
-        epilog='Example: python mscoco.py --download-dir ../datasets/coco',
+        epilog='Example: python mscoco.py --download-dir ../../datasets/coco',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--download-dir', type=str, default='../datasets/coco', help='dataset directory on disk')
+    parser.add_argument('--download-dir', type=str, default='../../datasets/coco', help='dataset directory on disk')
     parser.add_argument('--no-download', action='store_true', help='disable automatic download if set')
     parser.add_argument('--overwrite', action='store_true',
                         help='overwrite downloaded files if set, in case they are corrupted')

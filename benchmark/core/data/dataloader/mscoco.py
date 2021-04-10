@@ -40,7 +40,7 @@ class COCOSegmentation(SegmentationDataset):
                 1, 64, 20, 63, 7, 72]
     NUM_CLASS = 21
 
-    def __init__(self, root='../datasets/coco', split='train', mode=None, transform=None, **kwargs):
+    def __init__(self, root='../../datasets/coco', split='train', mode=None, transform=None, **kwargs):
         super(COCOSegmentation, self).__init__(root, split, mode, transform, **kwargs)
         # lazy import pycocotools
         from pycocotools.coco import COCO
@@ -64,8 +64,6 @@ class COCOSegmentation(SegmentationDataset):
             ids = list(self.coco.imgs.keys())
             self.ids = self._preprocess(ids, ids_file)
         self.transform = transform
-
-        self.images = self.coco
 
     def __getitem__(self, index):
         coco = self.coco
@@ -96,7 +94,7 @@ class COCOSegmentation(SegmentationDataset):
         mask = np.zeros((h, w), dtype=np.uint8)
         coco_mask = self.coco_mask
         for instance in target:
-            rle = coco_mask.frPyObjects(instance['Segmentation'], h, w)
+            rle = coco_mask.frPyObjects(instance['segmentation'], h, w)
             m = coco_mask.decode(rle)
             cat = instance['category_id']
             if cat in self.CAT_LIST:
@@ -138,4 +136,4 @@ class COCOSegmentation(SegmentationDataset):
                 'tv')
     
     def __len__(self):
-        return len(self.images)
+        return len(self.ids)
