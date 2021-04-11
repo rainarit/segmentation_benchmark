@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data as data
 import torch.backends.cudnn as cudnn
+from tqdm import tqdm
 
 from torchvision import transforms
 from core.data.dataloader import get_segmentation_dataset
@@ -59,7 +60,7 @@ def parse_args():
                         help='Auxiliary loss')
     parser.add_argument('--aux-weight', type=float, default=0.4,
                         help='auxiliary loss weight')
-    parser.add_argument('--batch-size', type=int, default=4, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=1, metavar='N',
                         help='input batch size for training (default: 8)')
     parser.add_argument('--start_epoch', type=int, default=0,
                         metavar='N', help='start epochs (default:0)')
@@ -84,7 +85,7 @@ def parse_args():
     # checkpoint and log
     parser.add_argument('--resume', type=str, default=None,
                         help='put the path to resuming file if needed')
-    parser.add_argument('--save-dir', default='~/.torch/models',
+    parser.add_argument('--save-dir', default='../../models',
                         help='Directory for saving checkpoint models')
     parser.add_argument('--save-epoch', type=int, default=10,
                         help='save model every checkpoint-epoch')
@@ -103,25 +104,15 @@ def parse_args():
     if args.epochs is None:
         epoches = {
             'coco': 30,
-            'pascal_aug': 80,
-            'pascal_voc': 50,
-            'pcontext': 80,
-            'ade20k': 160,
-            'citys': 120,
-            'sbu': 160,
+
         }
-        args.epochs = epoches[args.dataset.lower()]
+        args.epochs = epoches['coco']
     if args.lr is None:
         lrs = {
             'coco': 0.004,
-            'pascal_aug': 0.001,
-            'pascal_voc': 0.0001,
-            'pcontext': 0.001,
-            'ade20k': 0.01,
-            'citys': 0.01,
-            'sbu': 0.001,
+
         }
-        args.lr = lrs[args.dataset.lower()] / 8 * args.batch_size
+        args.lr = lrs['coco']
     return args
 
 
@@ -211,7 +202,8 @@ class Trainer(object):
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(epochs, max_iters))
 
         self.model.train()
-        for iteration, (images, targets, _) in enumerate(self.train_loader):
+        for iteration, (images, targets) in enumerate(self.train_loader):
+       
             iteration = iteration + 1
             self.lr_scheduler.step()
 
@@ -246,6 +238,8 @@ class Trainer(object):
             if not self.args.skip_val and iteration % val_per_iters == 0:
                 self.validation()
                 self.model.train()
+
+            break
 
         save_checkpoint(self.model, self.args, is_best=False)
         total_training_time = time.time() - start_time

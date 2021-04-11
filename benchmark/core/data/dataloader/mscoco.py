@@ -65,6 +65,8 @@ class COCOSegmentation(SegmentationDataset):
             self.ids = self._preprocess(ids, ids_file)
         self.transform = transform
 
+
+
     def __getitem__(self, index):
         coco = self.coco
         img_id = self.ids[index]
@@ -85,7 +87,7 @@ class COCOSegmentation(SegmentationDataset):
         # general resize, normalize and toTensor
         if self.transform is not None:
             img = self.transform(img)
-        return img, mask, os.path.basename(self.ids[index])
+        return img, mask
 
     def _mask_transform(self, mask):
         return torch.LongTensor(np.array(mask).astype('int32'))
