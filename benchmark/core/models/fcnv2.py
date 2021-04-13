@@ -51,7 +51,7 @@ class _FCNHead(nn.Module):
         return self.block(x)
 
 
-def get_fcn(dataset='pascal_voc', backbone='resnet50', pretrained=False, root='~/.torch/models',
+def get_fcn(dataset='coco', backbone='resnet50', pretrained=False, root='~/.torch/models',
             pretrained_base=True, **kwargs):
     acronyms = {
         'pascal_voc': 'pascal_voc',

@@ -9,13 +9,13 @@ from ..utils.download import download, check_sha1
 __all__ = ['get_model_file', 'get_resnet_file']
 
 _model_sha1 = {name: checksum for checksum, name in [
-    ('25c4b50959ef024fcc050213a06b614899f94b3d', 'resnet50'),
+    ('fb9de5b360976e3e8bd3679d3e93c5409a5eff3c', 'resnet50'),
     ('2a57e44de9c853fa015b172309a1ee7e2d0e4e2a', 'resnet101'),
     ('0d43d698c66aceaa2bc0309f55efdd7ff4b143af', 'resnet152'),
 ]}
 
-encoding_repo_url = 'https://hangzh.s3.amazonaws.com/'
-_url_format = '{repo_url}encoding/models/{file_name}.zip'
+encoding_repo_url = 'https://s3.us-west-1.wasabisys.com/encoding'
+_url_format = '{repo_url}models/{file_name}.zip'
 
 
 def short_hash(name):
