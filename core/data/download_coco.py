@@ -9,7 +9,7 @@ cur_path = os.path.abspath(os.path.dirname(__file__))
 root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
 sys.path.append(root_path)
 
-from ..utils import download, makedirs, try_import_pycocotools
+from segmentation_benchmark.core.utils import download, makedirs, try_import_pycocotools
 
 _TARGET_DIR = os.path.expanduser('/coco')
 
