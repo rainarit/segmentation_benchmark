@@ -56,7 +56,4 @@ if __name__ == '__main__':
         else:
             download_coco(path, overwrite=args.overwrite)
 
-    # make symlink
-    makedirs(os.path.expanduser('/dataset'))
-    os.symlink(path, _TARGET_DIR)
     try_import_pycocotools()
