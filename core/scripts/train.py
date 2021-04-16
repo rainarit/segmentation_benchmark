@@ -118,8 +118,6 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model_name = args.model + "_" + args.backbone
-
     model = _segm_model(name=args.model, 
                         backbone_name=args.backbone, 
                         num_classes=num_classes, 
