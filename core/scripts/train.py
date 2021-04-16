@@ -6,10 +6,20 @@ import torch
 import torch.utils.data
 from torch import nn
 import torchvision
+import os
+import sys
+
+
+cur_path = os.path.abspath(os.path.dirname(__file__))
+root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
+sys.path.append(root_path)
 
 from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
 import segmentation_benchmark.core.utils.smoothed_value as utils
+from segmentation_benchmark.core.models.get_segmentation_model import _segm_model
+
+CURRENT_MODELS = ['fcn_resnet50', 'fcn_resnet101']
 
 
 def get_dataset(dir_path, name, image_set, transform):
@@ -108,9 +118,15 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-                                                                 aux_loss=args.aux_loss,
-                                                                 pretrained=args.pretrained)
+    model_name = args.model + "_" + args.backbone
+
+    model = _segm_model(name=args.model, 
+                        backbone_name=args.backbone, 
+                        num_classes=num_classes, 
+                        aux=args.aux_loss, 
+                        pretrained_backbone=True)
+
+
     model.to(device)
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -176,7 +192,8 @@ def parse_args():
 
     parser.add_argument('--data-path', default='segmentation_benchmark/core/data/coco/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
-    parser.add_argument('--model', default='fcn_resnet101', help='model')
+    parser.add_argument('--model', default='fcn', help='model')
+    parser.add_argument('--backbone', default='resnet50', help='backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=8, type=int)
