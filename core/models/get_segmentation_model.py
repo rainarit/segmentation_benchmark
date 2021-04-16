@@ -1,5 +1,6 @@
 from segmentation_benchmark.core.utils import IntermediateLayerGetter
 from .backbone import resnet
+from .backbone import v1net
 from .fcn import FCN, FCNHead
 
 try:

@@ -18,9 +18,7 @@ from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
 import segmentation_benchmark.core.utils.smoothed_value as utils
 from segmentation_benchmark.core.models.get_segmentation_model import _segm_model
-
-CURRENT_MODELS = ['fcn_resnet50', 'fcn_resnet101']
-
+from segmentation_benchmark.core.utils.score import SegmentationMetric
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -124,7 +122,6 @@ def main(args):
                         aux=args.aux_loss, 
                         pretrained_backbone=True)
 
-
     model.to(device)
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -148,6 +145,8 @@ def main(args):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
+
+    metric = SegmentationMetric(num_classes)
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
