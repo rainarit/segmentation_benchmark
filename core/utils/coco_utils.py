@@ -6,11 +6,8 @@ from PIL import Image
 import os
 import sys
 
-cur_path = os.path.abspath(os.path.dirname(__file__))
-root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
-sys.path.append(root_path)
 
-from segmentation_benchmark.core.utils import try_import_pycocotools
+from .utils import try_import_pycocotools
 try_import_pycocotools()
 
 from pycocotools import mask as coco_mask
