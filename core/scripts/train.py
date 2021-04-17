@@ -224,9 +224,6 @@ def main(args):
             optimizer.step()
             lr_scheduler.step()
 
-            if iteration % save_per_iters == 0 and save_to_disk:
-                save_checkpoint(model, args, is_best=False)
-
             metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
         # evaluation   
@@ -237,7 +234,7 @@ def main(args):
         metric_logger = utils.MetricLogger(delimiter="  ")
         header = 'Test:'
         with torch.no_grad():
-            for image, target in metric_logger.log_every(data_loader_test, 100, header):
+            for i, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 100, header)):
                 image, target = image.to(device), target.to(device)
                 output = model(image)
                 output = output['out']
@@ -294,7 +291,7 @@ def parse_args():
     parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
-    parser.add_argument('--log-dir', default='./runs/logs/',
+    parser.add_argument('--log-dir', default='segmentation_benchmark/core/models/runs/logs/',
                         help='Directory for saving checkpoint models')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='.', help='path where to save')
@@ -303,6 +300,8 @@ def parse_args():
                         help='print log every log-iter')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
+    parser.add_argument('--save-dir', default='segmentation_benchmark/core/models',
+                        help='Directory for saving checkpoint models')
     # evaluation only
     parser.add_argument('--val-epoch', type=int, default=1,
                         help='run validation every val-epoch')
