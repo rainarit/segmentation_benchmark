@@ -208,6 +208,57 @@ class MetricLogger(object):
         print('{} Total time: {}'.format(header, total_time_str))
 
 
+
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+import logging
+import os
+import sys
+
+# reference from: https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/utils/logger.py
+def setup_logger(name, save_dir, distributed_rank, filename="log.txt", mode='w'):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    # don't log results for the non-master process
+    if distributed_rank > 0:
+        return logger
+    ch = logging.StreamHandler(stream=sys.stdout)
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        fh = logging.FileHandler(os.path.join(save_dir, filename), mode=mode)  # 'a+' for add, 'w' for overwrite
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
+    return logger
+
+
+import torch.distributed as dist
+
+from torch.utils.data.sampler import Sampler, BatchSampler
+
+# reference: https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/utils/comm.py
+def get_world_size():
+    if not dist.is_available():
+        return 1
+    if not dist.is_initialized():
+        return 1
+    return dist.get_world_size()
+
+
+def get_rank():
+    if not dist.is_available():
+        return 0
+    if not dist.is_initialized():
+        return 0
+    return dist.get_rank()
+
+
 def cat_list(images, fill_value=0):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
     batch_shape = (len(images),) + max_size
