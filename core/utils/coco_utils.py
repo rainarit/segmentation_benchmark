@@ -3,8 +3,8 @@ import torch
 import torch.utils.data
 import torchvision
 from PIL import Image
-
 import os
+import sys
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
 root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
