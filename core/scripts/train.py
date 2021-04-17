@@ -16,7 +16,7 @@ sys.path.append(root_path)
 
 from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
-import segmentation_benchmark.core.utils.smoothed_value as utils
+import segmentation_benchmark.core.utils.utils as utils
 from segmentation_benchmark.core.models.get_segmentation_model import _segm_model
 from segmentation_benchmark.core.utils.score import SegmentationMetric
 
