@@ -6,6 +6,9 @@ from PIL import Image
 
 import os
 
+from segmentation_benchmark.core.utils import try_import_pycocotools
+try_import_pycocotools()
+
 from pycocotools import mask as coco_mask
 
 from .transforms import Compose
