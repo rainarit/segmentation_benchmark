@@ -114,7 +114,7 @@ def main(args):
     device = torch.device(args.device)
 
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
-    
+
     # setup logger-2
     logger = utils.setup_logger("semantic_segmentation", args.log_dir, utils.get_rank(), filename='{}_{}_{}_log.txt'.format(
         args.model, args.backbone, args.dataset))
