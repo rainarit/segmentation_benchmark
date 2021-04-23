@@ -220,12 +220,13 @@ def main(args):
             image, target = image.to(device), target.to(device)
             output = model(image)
             loss = criterion(output, target)
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-
             metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+            
+            optimizer.zero_grad()
 
         # evaluation   
         is_best = False
