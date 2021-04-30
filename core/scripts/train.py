@@ -51,23 +51,6 @@ def criterion(inputs, target):
     return losses['out'] + 0.5 * losses['aux']
 
 
-def save_checkpoint(model, args, is_best=False):
-    """Save Checkpoint"""
-    directory = os.path.expanduser(args.save_dir)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    filename = '{}_{}_{}.pth'.format(args.model, args.backbone, args.dataset)
-    filename = os.path.join(directory, filename)
-
-    if args.distributed:
-        model = model.module
-    torch.save(model.state_dict(), filename)
-    if is_best:
-        best_filename = '{}_{}_{}_best_model.pth'.format(args.model, args.backbone, args.dataset)
-        best_filename = os.path.join(directory, best_filename)
-        shutil.copyfile(filename, best_filename)
-
-
 def evaluate(model, data_loader, device, num_classes):
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
@@ -114,16 +97,6 @@ def main(args):
 
     device = torch.device(args.device)
 
-    num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
-
-    # setup logger-2
-    logger = utils.setup_logger("semantic_segmentation", args.log_dir, utils.get_rank(), filename='{}_{}_{}_log.txt'.format(
-        args.model, args.backbone, args.dataset))
-    logger.info("Using {} GPUs".format(num_gpus))
-    logger.info(args)
-
-
-    # dataset and dataloader
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
@@ -144,8 +117,6 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-
-    # create network
     model = _segm_model(name=args.model, 
                         backbone_name=args.backbone, 
                         num_classes=num_classes, 
@@ -162,34 +133,21 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-
-    # optimizer
     params_to_optimize = [
         {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
         {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
     ]
-
     if args.aux_loss:
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
+    optimizer = torch.optim.SGD(
+        params_to_optimize,
+        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    optimizer = torch.optim.SGD(params_to_optimize,
-                                lr=args.lr, 
-                                momentum=args.momentum, 
-                                weight_decay=args.weight_decay)
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
-
-    # lr scheduling
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                                                     lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
-
-    # evaluation metrics
-    metric = SegmentationMetric(num_classes)
-
-    best_pred = 0.0
-
-
-    # resume checkpoint if needed
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
         model_without_ddp.load_state_dict(checkpoint['model'], strict=not args.test_only)
@@ -203,59 +161,13 @@ def main(args):
         print(confmat)
         return
 
-
-    # training
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        
-        print_freq = args.print_freq
-
-        model.train()
-        metric_logger = utils.MetricLogger(delimiter="  ")
-        metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
-        header = 'Epoch: [{}]'.format(epoch)
-        for iteration, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-            image, target = image.to(device), target.to(device)
-            output = model(image)
-            loss = criterion(output, target)
-            #optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
-            
-            optimizer.zero_grad()
-
-        # evaluation   
-        is_best = False
-        metric.reset() 
-        model.eval()
-        confmat = utils.ConfusionMatrix(num_classes)
-        metric_logger = utils.MetricLogger(delimiter="  ")
-        header = 'Test:'
-        with torch.no_grad():
-            for i, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 100, header)):
-                image, target = image.to(device), target.to(device)
-                output = model(image)
-                output = output['out']
-
-                metric.update(output, target)
-                confmat.update(target.flatten(), output.argmax(1).flatten())
-
-                pixAcc, mIoU = metric.get()
-                logger.info("Sample: {:d}, Validation pixAcc: {:.3f}, mIoU: {:.3f}".format(i + 1, pixAcc, mIoU))
-            
-            new_pred = (pixAcc + mIoU) / 2
-            if new_pred > best_pred:
-                is_best = True
-                best_pred = new_pred
-            save_checkpoint(model, args, is_best)
-
-            confmat.reduce_from_all_processes()
+        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-
         utils.save_on_master(
             {
                 'model': model_without_ddp.state_dict(),
