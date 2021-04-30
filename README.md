@@ -4,7 +4,6 @@ Install Git Repository
 ```bash
 git clone https://github.com/rainarit/segmentation_benchmark.git
 cd segmentation_benchmark
-cd scripts
 ```
 ## How to Run:
 ### Download COCO Dataset:
