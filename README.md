@@ -18,3 +18,5 @@ cd segmentation_benchmark
 ## License ![GitHub](https://img.shields.io/github/license/rainarit/segmentation_benchmark)
 
 This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/rainarit/segmentation-benchmark/blob/main/LICENSE) file for details
+
+
