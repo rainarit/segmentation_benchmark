@@ -1,3 +1,5 @@
+Status: Active (updates are to be expected)
+
 # Image Segmentation Benchmark Documentation
 ## Prerequisites
 Install Git Repository
