@@ -19,7 +19,7 @@ def parse_args():
         description='Initialize MS COCO dataset.',
         epilog='Example: python mscoco.py --download-dir /coco',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--download-dir', type=str, default='segmentation_benchmark/core/data/coco', help='dataset directory on disk')
+    parser.add_argument('--download-dir', type=str, default='./coco', help='dataset directory on disk')
     parser.add_argument('--no-download', action='store_true', help='disable automatic download if set')
     parser.add_argument('--overwrite', action='store_true',
                         help='overwrite downloaded files if set, in case they are corrupted')
