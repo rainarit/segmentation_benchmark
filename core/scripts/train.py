@@ -168,15 +168,6 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        utils.save_on_master(
-            {
-                'model': model_without_ddp.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'lr_scheduler': lr_scheduler.state_dict(),
-                'epoch': epoch,
-                'args': args
-            },
-            os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
