@@ -11,7 +11,7 @@ sys.path.append(root_path)
 
 from segmentation_benchmark.core.utils import download, makedirs, try_import_pycocotools
 
-_TARGET_DIR = os.path.expanduser('segmentation_benchmark/core/data/coco')
+_TARGET_DIR = os.path.expanduser('/data/coco')
 
 
 def parse_args():
