@@ -15,6 +15,10 @@ cur_path = os.path.abspath(os.path.dirname(__file__))
 root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
 sys.path.append(root_path)
 
+_DATASET_DIR = root_path + "/segmentation_benchmark/core/data/coco/"
+
+_LOG_DIR = root_path + "/segmentation_benchmark/core/models/runs/logs/"
+
 from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
 import segmentation_benchmark.core.utils.utils as utils
@@ -178,7 +182,7 @@ def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training')
 
-    parser.add_argument('--data-path', default='segmentation_benchmark/core/data/coco/', help='dataset path')
+    parser.add_argument('--data-path', default=_DATASET_DIR, help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='fcn', help='model')
     parser.add_argument('--backbone', default='resnet50', help='backbone')
@@ -196,7 +200,7 @@ def parse_args():
     parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
-    parser.add_argument('--log-dir', default='segmentation_benchmark/core/models/runs/logs/',
+    parser.add_argument('--log-dir', default=_LOG_DIR,
                         help='Directory for saving checkpoint models')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='.', help='path where to save')
