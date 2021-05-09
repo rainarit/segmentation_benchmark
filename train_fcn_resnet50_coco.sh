@@ -9,5 +9,5 @@ echo "Running Model"
 
 python core/scripts/train.py \
  --lr=${LEARNING_RATE} \
- --batch_size=${BATCH_SIZE} \
+ --batch-size=${BATCH_SIZE} \
  --workers=${WORKERS}
