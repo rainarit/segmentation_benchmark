@@ -11,7 +11,7 @@ sys.path.append(root_path)
 
 from segmentation_benchmark.core.utils import download, makedirs, try_import_pycocotools
 
-_TARGET_DIR = os.path.expanduser('/data/coco')
+_TARGET_DIR = cur_path + '/coco'
 
 
 def parse_args():
@@ -19,7 +19,7 @@ def parse_args():
         description='Initialize MS COCO dataset.',
         epilog='Example: python mscoco.py --download-dir /coco',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--download-dir', type=str, default='./coco', help='dataset directory on disk')
+    parser.add_argument('--download-dir', type=str, default=_TARGET_DIR, help='dataset directory on disk')
     parser.add_argument('--no-download', action='store_true', help='disable automatic download if set')
     parser.add_argument('--overwrite', action='store_true',
                         help='overwrite downloaded files if set, in case they are corrupted')
