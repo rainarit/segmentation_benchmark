@@ -209,6 +209,7 @@ def parse_args():
                         help='print log every log-iter')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
+    parser.add_argument('--local-rank', default=0, type=int)
     parser.add_argument('--save-dir', default='segmentation_benchmark/core/models',
                         help='Directory for saving checkpoint models')
     # evaluation only
