@@ -22,7 +22,7 @@ _LOG_DIR = root_path + "/segmentation_benchmark/core/models/runs/logs/"
 from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
 import segmentation_benchmark.core.utils.utils as utils
-from segmentation_benchmark.core.models.get_segmentation_model import _segm_model
+from segmentation_benchmark.core.models.get_segmentation_model import _segm_model, _load_model
 from segmentation_benchmark.core.utils.score import SegmentationMetric
 
 def get_dataset(dir_path, name, image_set, transform):
@@ -121,11 +121,11 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = _segm_model(name=args.model, 
-                        backbone_name=args.backbone, 
-                        num_classes=num_classes, 
-                        aux=args.aux_loss, 
-                        pretrained_backbone=True)
+    model = _load_model(arch_type=args.model, 
+                        num_classes=num_classes,
+                        backbone=args.backbone, 
+                        pretrained=args.pretrained, 
+                        aux_loss=args.aux_loss)
     model.to(device)
 
     if args.distributed:
