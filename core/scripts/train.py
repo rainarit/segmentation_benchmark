@@ -125,6 +125,7 @@ def main(args):
                         num_classes=num_classes,
                         backbone=args.backbone, 
                         pretrained=args.pretrained, 
+                        progress=True,
                         aux_loss=args.aux_loss)
     model.to(device)
 
