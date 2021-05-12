@@ -1,7 +1,7 @@
 LEARNING_RATE=0.02
 BATCH_SIZE=4
 WORKERS=4
-BACKBONE='resnet100'
+BACKBONE='resnet101'
 
 
 echo "Running Model"
