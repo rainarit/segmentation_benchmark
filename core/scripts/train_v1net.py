@@ -152,7 +152,6 @@ def main(args):
         model_without_ddp = model.module
 
     optimizer = torch.optim.SGD(
-        params_to_optimize,
         lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
