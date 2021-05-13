@@ -79,7 +79,7 @@ print('==> Building model..')
 # net = ResNet18_V1Net(kernel_size=3, kernel_size_exc=7, 
 #                      kernel_size_inh=5, timesteps=timesteps,
 #                      remove_v1net=remove_v1net)
-net = PreActResNetV1Net18(num_classes=100, kernel_size=3, 
+net = PreActResNetV1Net18(num_classes=21, kernel_size=3, 
                           kernel_size_exc=5, kernel_size_inh=3, 
                           timesteps=3)
 # net = PreActResNet18(num_classes=100)
