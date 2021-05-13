@@ -72,11 +72,11 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", get_transform(train=True))
 trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=128, shuffle=True, num_workers=2)
+    trainset, batch_size=2, shuffle=True, num_workers=2)
 
 testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", get_transform(train=False))
 testloader = torch.utils.data.DataLoader(
-    testset, batch_size=100, shuffle=False, num_workers=2)
+    testset, batch_size=1, shuffle=False, num_workers=2)
 
 # Model
 print('==> Building model..')
