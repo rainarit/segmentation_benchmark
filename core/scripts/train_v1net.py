@@ -118,21 +118,21 @@ if device == 'cuda':
   # net = torch.nn.DataParallel(net)
   cudnn.benchmark = True
 
-#criterion = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=1e-2,
                        momentum=0.9, nesterov=True,
                        weight_decay=1e-3)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-def criterion(inputs, target):
-    losses = {}
-    for name, x in inputs.item():
-        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
+# def criterion(inputs, target):
+#     losses = {}
+#     for name, x in inputs.items():
+#         losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
 
-    if len(losses) == 1:
-        return losses['out']
+#     if len(losses) == 1:
+#         return losses['out']
 
-    return losses['out'] + 0.5 * losses['aux']
+#     return losses['out'] + 0.5 * losses['aux']
 
 # Training
 def train(epoch):
