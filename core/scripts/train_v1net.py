@@ -151,11 +151,13 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-    optimizer = optim.SGD(model.parameters(), lr=1e-2,
-                       momentum=0.9, nesterov=True,
-                       weight_decay=1e-3)
+    optimizer = torch.optim.SGD(
+        params_to_optimize,
+        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)  
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)  
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
