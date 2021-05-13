@@ -13,7 +13,6 @@ import torch.optim as optim  # pylint: disable=import-error
 import torchvision  # pylint: disable=import-error
 import torchvision.models as models  # pylint: disable=import-error
 import torchvision.transforms as transforms  # pylint: disable=import-error
-from absl import app, flags
 
 from segmentation_benchmark.core.models.backbone import ResNet18_V1Net
 from segmentation_benchmark.core.models.backbone import PreActResNet18, PreActResNet50, PreActResNetV1Net18
