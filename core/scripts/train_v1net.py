@@ -138,9 +138,7 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = PreActResNetV1Net18(num_classes=21, kernel_size=3, 
-                          kernel_size_exc=5, kernel_size_inh=3, 
-                          timesteps=3)
+    model = ResNet18_V1Net(num_classes=21)
     
     model.to(device)
 
