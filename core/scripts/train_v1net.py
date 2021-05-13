@@ -65,6 +65,11 @@ timesteps = 0
 write_results = None  # "cifar_predictions/resnet18_v1net_predictions_eval_t_%s_remove_v1net_%s" % (timesteps, remove_v1net)
 checkpoint = None  # checkpoint/ckpt_4steps_reg_remove_v1net_True.pth"
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+best_acc = 0  # best test accuracy
+start_epoch = 0  # start from epoch 0 or last checkpoint epoch
+
+
 trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", get_transform(train=True))
 trainloader = torch.utils.data.DataLoader(
     trainset, batch_size=128, shuffle=True, num_workers=2)
@@ -97,6 +102,7 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 def test(epoch):
   global best_acc
   net.eval()
+  confmat = utils.ConfusionMatrix(num_classes)
   if checkpoint:
     state_dict = torch.load(checkpoint)
     print("Loading from %s with accuracy %s" % (checkpoint, 
@@ -112,6 +118,7 @@ def test(epoch):
     for batch_idx, (inputs, targets) in enumerate(testloader):
       inputs, targets = inputs.to(device), targets.to(device)
       outputs = net(inputs)
+      confmat.update(target.flatten(), output.argmax(1).flatten())
       if write_results:
         np_predictions.extend(outputs.cpu().numpy())
         np_targets.extend(targets.cpu().numpy())
@@ -121,6 +128,8 @@ def test(epoch):
       _, predicted = outputs.max(1)
       total += targets.size(0)
       correct += predicted.eq(targets).sum().item()
+    confmat.reduce_from_all_processes()
+    print(confmat)
     print('Test Loss: %.3f | Acc: %.3f%% (%d/%d)'
                 % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
     acc = 100.*correct/total
