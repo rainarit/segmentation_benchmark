@@ -99,8 +99,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         output = model(image)
         print(output.size())
         print(target.size())
-        print(target[1].size())
-        loss = criterion(output, target.squeeze(1))
+        print(target.squeeze().size())
+        loss = criterion(output, target.squeeze())
 
         optimizer.zero_grad()
         loss.backward()
