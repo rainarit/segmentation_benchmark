@@ -152,7 +152,7 @@ def main(args):
         model_without_ddp = model.module
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=1e-2,
+    optimizer = optim.SGD(model.parameters(), lr=1e-2,
                        momentum=0.9, nesterov=True,
                        weight_decay=1e-3)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200) 
