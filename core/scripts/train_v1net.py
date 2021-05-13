@@ -97,8 +97,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
         image, target = image.to(device), target.to(device)
         output = model(image)
-        print(image.size())
+        print(output.size())
         print(target.size())
+        print(target[0].size())
         loss = criterion(output, target[0])
 
         optimizer.zero_grad()
