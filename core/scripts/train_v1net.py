@@ -192,5 +192,66 @@ def main(args):
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
 
-if __name__=="__main__":
-  main()
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description='PyTorch Segmentation Training')
+
+    parser.add_argument('--data-path', default=_DATASET_DIR, help='dataset path')
+    parser.add_argument('--dataset', default='coco', help='dataset name')
+    parser.add_argument('--model', default='fcn', help='model')
+    parser.add_argument('--backbone', default='resnet50', help='backbone')
+    parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
+    parser.add_argument('--device', default='cuda', help='device')
+    parser.add_argument('-b', '--batch-size', default=8, type=int)
+    parser.add_argument('--epochs', default=30, type=int, metavar='N',
+                        help='number of total epochs to run')
+
+    parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
+                        help='number of data loading workers (default: 16)')
+    parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
+    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
+                        help='momentum')
+    parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
+                        metavar='W', help='weight decay (default: 1e-4)',
+                        dest='weight_decay')
+    parser.add_argument('--log-dir', default=_LOG_DIR,
+                        help='Directory for saving checkpoint models')
+    parser.add_argument('--print-freq', default=1, type=int, help='print frequency')
+    parser.add_argument('--output-dir', default='.', help='path where to save')
+    parser.add_argument('--resume', default='', help='resume from checkpoint')
+    parser.add_argument('--log-iter', type=int, default=10,
+                        help='print log every log-iter')
+    parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
+                        help='start epoch')
+    parser.add_argument('--local_rank', default=0, type=int)
+    parser.add_argument('--save-dir', default='segmentation_benchmark/core/models',
+                        help='Directory for saving checkpoint models')
+    # evaluation only
+    parser.add_argument('--val-epoch', type=int, default=1,
+                        help='run validation every val-epoch')
+    parser.add_argument('--skip-val', action='store_true', default=False,
+                        help='skip validation during training')
+    parser.add_argument(
+        "--test-only",
+        dest="test_only",
+        help="Only test the model",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--pretrained",
+        dest="pretrained",
+        help="Use pre-trained models from the modelzoo",
+        action="store_true",
+    )
+    # distributed training parameters
+    parser.add_argument('--world-size', default=1, type=int,
+                        help='number of distributed processes')
+    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+
+    args = parser.parse_args()
+    return args
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
