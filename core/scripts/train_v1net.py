@@ -1,6 +1,14 @@
 """Training ResNetV1Net on COCO2017."""
 
-import argparse
+import datetime
+import os
+import time
+import shutil
+
+import torch
+import torch.utils.data
+from torch import nn
+import torchvision
 import os
 import sys
 
@@ -13,6 +21,10 @@ import torch.optim as optim  # pylint: disable=import-error
 import torchvision  # pylint: disable=import-error
 import torchvision.models as models  # pylint: disable=import-error
 import torchvision.transforms as transforms  # pylint: disable=import-error
+
+cur_path = os.path.abspath(os.path.dirname(__file__))
+root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
+sys.path.append(root_path)
 
 from segmentation_benchmark.core.models.backbone import ResNet18_V1Net
 from segmentation_benchmark.core.models.backbone import PreActResNet18, PreActResNet50, PreActResNetV1Net18
