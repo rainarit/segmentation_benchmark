@@ -100,7 +100,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         print(output.size())
         print(target.size())
         print(target.squeeze().size())
-        loss = criterion(output, target.squeeze())
+        loss = criterion(output, np.argmax(target,axis=1))
 
         optimizer.zero_grad()
         loss.backward()
