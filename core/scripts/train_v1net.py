@@ -69,12 +69,26 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
+transform_train = transforms.Compose([
+    transforms.RandomCrop(32, padding=4),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), 
+                         (0.2023, 0.1994, 0.2010)),
+])
 
-trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", get_transform(train=True))
+transform_test = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), 
+                         (0.2023, 0.1994, 0.2010)),
+])
+
+
+trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", transform_train)
 trainloader = torch.utils.data.DataLoader(
     trainset, batch_size=2, shuffle=True, num_workers=2)
 
-testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", get_transform(train=False))
+testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", transform_test)
 testloader = torch.utils.data.DataLoader(
     testset, batch_size=1, shuffle=False, num_workers=2)
 
