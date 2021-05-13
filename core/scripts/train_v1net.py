@@ -65,11 +65,11 @@ timesteps = 0
 write_results = None  # "cifar_predictions/resnet18_v1net_predictions_eval_t_%s_remove_v1net_%s" % (timesteps, remove_v1net)
 checkpoint = None  # checkpoint/ckpt_4steps_reg_remove_v1net_True.pth"
 
-trainset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
+trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", get_transform(train=True))
 trainloader = torch.utils.data.DataLoader(
     trainset, batch_size=128, shuffle=True, num_workers=2)
 
-testset, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", get_transform(train=False))
 testloader = torch.utils.data.DataLoader(
     testset, batch_size=100, shuffle=False, num_workers=2)
 
