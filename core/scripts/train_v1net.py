@@ -100,7 +100,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         print(image.size())
         print(output.size())
         print(target.size())
-        print(target[0])
+        print(target[0].squeeze())
         loss = criterion(output, np.argmax(target,axis=1))
 
         optimizer.zero_grad()
