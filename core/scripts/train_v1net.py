@@ -126,7 +126,7 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 def criterion(inputs, target):
     losses = {}
-    for name, x in inputs.items():
+    for name, x in inputs.item():
         losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
 
     if len(losses) == 1:
