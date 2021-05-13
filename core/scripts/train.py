@@ -121,12 +121,8 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = _load_model(arch_type=args.model, 
-                        num_classes=num_classes,
-                        backbone=args.backbone, 
-                        pretrained=args.pretrained, 
-                        progress=True,
-                        aux_loss=args.aux_loss)
+    model = torchvision.models.segmentation.fcn_resnet50(pretrained=False, progress=True, num_classes=21, aux_loss=True)
+    
     model.to(device)
 
     if args.distributed:
@@ -173,19 +169,7 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        checkpoint = {
-            'model': model_without_ddp.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'lr_scheduler': lr_scheduler.state_dict(),
-            'epoch': epoch,
-            'args': args
-        }
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'checkpoint.pth'))
+        
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

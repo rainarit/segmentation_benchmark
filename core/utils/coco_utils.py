@@ -14,7 +14,6 @@ from pycocotools import mask as coco_mask
 
 from .transforms import Compose
 
-
 class FilterAndRemapCocoCategories(object):
     def __init__(self, categories, remap=True):
         self.categories = categories
