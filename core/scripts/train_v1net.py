@@ -151,7 +151,14 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-    optimizer = torch.optim.SGD(
+    params_to_optimize = [
+        {"params": [p for p in model_without_ddp.parameters() if p.requires_grad]},
+    ]
+    if args.aux_loss:
+        params = [p for p in model_without_ddp.parameters() if p.requires_grad]
+        params_to_optimize.append({"params": params, "lr": args.lr * 10})
+
+    optimizer = torch.optim.SGD(params_to_optimize,
         lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
