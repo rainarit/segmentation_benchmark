@@ -84,11 +84,11 @@ transform_test = transforms.Compose([
 ])
 
 
-trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", transform_train)
+trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", get_transform(train=True))
 trainloader = torch.utils.data.DataLoader(
     trainset, batch_size=2, shuffle=True, num_workers=2)
 
-testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", transform_test)
+testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", get_transform(train=False))
 testloader = torch.utils.data.DataLoader(
     testset, batch_size=1, shuffle=False, num_workers=2)
 
