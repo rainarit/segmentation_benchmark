@@ -85,12 +85,23 @@ transform_test = transforms.Compose([
 
 
 trainset, num_classes = get_dataset(_DATASET_DIR, 'coco', "train", get_transform(train=True))
+train_sampler = torch.utils.data.RandomSampler(trainset)
+
+
 trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=2, shuffle=True, num_workers=2)
+        trainset, batch_size=2,
+        sampler=train_sampler, num_workers=2,
+        collate_fn=utils.collate_fn, drop_last=True)
+
 
 testset, _ = get_dataset(_DATASET_DIR, 'coco', "val", get_transform(train=False))
+test_sampler = torch.utils.data.SequentialSampler(testset)
+
+
 testloader = torch.utils.data.DataLoader(
-    testset, batch_size=1, shuffle=False, num_workers=2)
+        testset, batch_size=1,
+        sampler=test_sampler, num_workers=2,
+        collate_fn=utils.collate_fn)
 
 # Model
 print('==> Building model..')
