@@ -28,6 +28,10 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
             kernel_size_exc=7,
             kernel_size_inh=3,
             remove_v1net=False)
+        out_layer = 'layer4'
+        out_inplanes = 2048
+        aux_layer = 'layer3'
+        aux_inplanes = 1024
     elif 'resnet' in backbone_name:
         backbone = resnet.__dict__[backbone_name](
             pretrained=pretrained_backbone,
