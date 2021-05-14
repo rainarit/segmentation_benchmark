@@ -100,7 +100,7 @@ def _resnet_v1net(
     kernel_size_inh: int,
     remove_v1net: bool,
 ) -> ResNet18_V1Net:
-    model = ResNet18_V1Net(self, 
+    model = ResNet18_V1Net( 
                timesteps=timesteps,
                num_classes=num_classes,
                kernel_size=kernel_size,
