@@ -10,14 +10,7 @@ except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
 
-__all__ = ['fcn_resnet50', 'fcn_resnet101']
-
-
-model_urls = {
-    'fcn_resnet50_coco': 'https://download.pytorch.org/models/fcn_resnet50_coco-1167a1af.pth',
-    'fcn_resnet101_coco': 'https://download.pytorch.org/models/fcn_resnet101_coco-7ecb50ca.pth'
-}
-
+__all__ = ['fcn_resnet50', 'fcn_resnet101', 'fcn_resnet18_v1net']
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
     if 'resnet18_v1net' in backbone_name:
@@ -32,6 +25,22 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
         out_inplanes = 2048
         aux_layer = 'layer3'
         aux_inplanes = 1024
+
+        model_map = {
+            'fcn': (FCNHead, FCN),
+        }
+
+        aux_classifier = None
+        if aux:
+            return_layers[aux_layer] = 'aux'
+            aux_classifier = FCNHead(aux_inplanes, num_classes)
+
+        backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
+        classifier = model_map[name][0](out_inplanes, num_classes)
+        base_model = model_map[name][1]
+        return base_model(backbone, classifier, aux_classifier)
+
+
     elif 'resnet' in backbone_name:
         backbone = resnet.__dict__[backbone_name](
             pretrained=pretrained_backbone,
@@ -42,17 +51,6 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
         aux_inplanes = 1024
     else:
         raise NotImplementedError('backbone {} is not supported as of now'.format(backbone_name))
-
-    if 'resnet18_v1net' in backbone_name:
-        model_map = {
-            'fcn': (FCNHead, FCN),
-        }
-        classifier = model_map[name][0](out_inplanes, num_classes)
-        base_model = model_map[name][1]
-        aux_classifier = None
-        if aux:
-            aux_classifier = FCNHead(aux_inplanes, num_classes)
-        return base_model(backbone, classifier, aux_classifier)
 
     return_layers = {out_layer: 'out'}
     if aux:
