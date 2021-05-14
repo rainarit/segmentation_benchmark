@@ -21,24 +21,12 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
             kernel_size_exc=7,
             kernel_size_inh=3,
             remove_v1net=False)
-        out_layer = 'layer4'
-        out_inplanes = 2048
-        aux_layer = 'layer3'
-        aux_inplanes = 1024
 
         model_map = {
             'fcn': (FCNHead, FCN),
         }
 
-        return_layers = {out_layer: 'out'}
-        
-        aux_classifier = None
-        if aux:
-            return_layers[aux_layer] = 'aux'
-            aux_classifier = FCNHead(aux_inplanes, num_classes)
-
-        backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
-        classifier = model_map[name][0](out_inplanes, num_classes)
+        classifier = model_map[name][0](512, num_classes)
         base_model = model_map[name][1]
         return base_model(backbone, classifier, aux_classifier)
 

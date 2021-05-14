@@ -88,10 +88,6 @@ class ResNet18_V1Net(nn.Module):
       )[start:end])
     return modified_model
 
-
-
-
-
 def _resnet_v1net(
     timesteps: int,
     num_classes: int,
