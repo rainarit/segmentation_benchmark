@@ -28,6 +28,7 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
 
         classifier = model_map[name][0](512, num_classes)
         base_model = model_map[name][1]
+        aux_classifier = None
         return base_model(backbone, classifier, aux_classifier)
 
 
