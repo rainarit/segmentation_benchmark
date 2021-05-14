@@ -27,6 +27,14 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
         out_inplanes = 2048
         aux_layer = 'layer3'
         aux_inplanes = 1024
+    elif 'resnet18_v1net' in backbone_name:
+        backbone = v1net.__dict__[backbone_name](
+            timesteps=3,
+            num_classes=num_classes,
+            kernel_size=5,
+            kernel_size_exc=7,
+            kernel_size_inh=3,
+            remove_v1net=False)
     else:
         raise NotImplementedError('backbone {} is not supported as of now'.format(backbone_name))
 

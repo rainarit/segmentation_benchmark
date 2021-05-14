@@ -87,3 +87,33 @@ class ResNet18_V1Net(nn.Module):
       model.children()
       )[start:end])
     return modified_model
+
+
+
+
+
+def _resnet_v1net(
+    timesteps: int,
+    num_classes: int,
+    kernel_size: int,
+    kernel_size_exc: int,
+    kernel_size_inh: int,
+    remove_v1net: bool,
+) -> ResNet18_V1Net:
+    model = ResNet18_V1Net(self, 
+               timesteps=timesteps,
+               num_classes=num_classes,
+               kernel_size=kernel_size,
+               kernel_size_exc=kernel_size_exc,
+               kernel_size_inh=kernel_size_inh,
+               remove_v1net=remove_v1net)
+    return model
+
+
+def resnet18_v1net(timesteps: int, num_classes: int, kernel_size: int, kernel_size_exc: int, kernel_size_inh: int, remove_v1net: bool) -> ResNet18_V1Net:
+    return _resnet_v1net(timesteps=timesteps,
+               num_classes=num_classes,
+               kernel_size=kernel_size,
+               kernel_size_exc=kernel_size_exc,
+               kernel_size_inh=kernel_size_inh,
+               remove_v1net=remove_v1net)
