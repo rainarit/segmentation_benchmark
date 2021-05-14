@@ -30,6 +30,8 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
             'fcn': (FCNHead, FCN),
         }
 
+        return_layers = {out_layer: 'out'}
+        
         aux_classifier = None
         if aux:
             return_layers[aux_layer] = 'aux'
