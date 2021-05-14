@@ -1,6 +1,7 @@
 from segmentation_benchmark.core.utils import IntermediateLayerGetter
 from .backbone import resnet
 from .backbone import v1net
+from .backbone import resnet_v1net
 from .fcn import FCN, FCNHead
 
 try:
@@ -20,7 +21,7 @@ model_urls = {
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
     if 'resnet18_v1net' in backbone_name:
-        backbone = v1net.__dict__[backbone_name](
+        backbone = resnet_v1net.__dict__[backbone_name](
             timesteps=3,
             num_classes=num_classes,
             kernel_size=5,
