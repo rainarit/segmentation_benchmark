@@ -43,6 +43,17 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
     else:
         raise NotImplementedError('backbone {} is not supported as of now'.format(backbone_name))
 
+    if 'resnet18_v1net' in backbone_name:
+        model_map = {
+            'fcn': (FCNHead, FCN),
+        }
+        classifier = model_map[name][0](out_inplanes, num_classes)
+        base_model = model_map[name][1]
+        aux_classifier = None
+        if aux:
+            aux_classifier = FCNHead(aux_inplanes, num_classes)
+        return base_model(backbone, classifier, aux_classifier)
+
     return_layers = {out_layer: 'out'}
     if aux:
         return_layers[aux_layer] = 'aux'
