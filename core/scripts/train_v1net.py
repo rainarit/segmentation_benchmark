@@ -124,15 +124,6 @@ optimizer = optim.SGD(net.parameters(), lr=1e-2,
                        weight_decay=1e-3)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-# def criterion(inputs, target):
-#     losses = {}
-#     for name, x in inputs.items():
-#         losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
-
-#     if len(losses) == 1:
-#         return losses['out']
-
-#     return losses['out'] + 0.5 * losses['aux']
 
 # Training
 def train(epoch):
@@ -223,7 +214,7 @@ def main():
   if test_run:
     test(-1)
   else:
-    for epoch in range(start_epoch, start_epoch+200):
+    for epoch in range(start_epoch, start_epoch+20):
       train(epoch)
       test(epoch)
       if epoch > 0 and epoch % 10 == 0:

@@ -121,7 +121,12 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = torchvision.models.segmentation.fcn_resnet50(pretrained=False, progress=True, num_classes=21, aux_loss=True)
+    model = _load_model(arch_type=args.model, 
+                        backbone=args.backbone, 
+                        pretrained=args.pretrained, 
+                        progress=True, 
+                        num_classes=num_classes, 
+                        aux_loss=args.aux_loss)
     
     model.to(device)
 
