@@ -10,7 +10,7 @@ except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
 
-__all__ = ['fcn_resnet50', 'fcn_resnet101', 'fcn_resnet18_v1net']
+__all__ = ['fcn_resnet50', 'fcn_resnet101', '_segm_model']
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
     if 'resnet18_v1net' in backbone_name:
