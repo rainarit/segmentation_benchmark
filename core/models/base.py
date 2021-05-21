@@ -20,7 +20,7 @@ class _SimpleSegmentationModel(nn.Module):
         print(features.shape)
 
         result = OrderedDict()
-        x = features["out"]
+        x = features
         x = self.classifier(x)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         result["out"] = x
