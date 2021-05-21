@@ -45,7 +45,7 @@ class ResNet18_V1Net(nn.Module):
     model = models.resnet18(pretrained=True).cuda()
     self.resnet_conv_1 = self.extract_layer(model, 
                                             'resnet18',
-                                            'retina')
+                                            'v1')
     if not self.remove_v1net:
       self.v1net_conv = V1Net(64, 64, 
                               kernel_size,
@@ -53,8 +53,7 @@ class ResNet18_V1Net(nn.Module):
                               kernel_size_inh)
     self.resnet_conv_2 = self.extract_layer(model,
                                             'resnet18',
-                                            'cortex')
-    self.fc = nn.Linear(512, num_classes)
+                                            'v1+')
 
   def standardize(self, inputs):
     """Mean normalize input images."""
@@ -62,25 +61,25 @@ class ResNet18_V1Net(nn.Module):
     return inputs
   
   def forward(self, features):
-    net = self.standardize(features)
-    net = self.resnet_conv_1(net)
+    net = self.resnet_conv_1(features)
     if not self.remove_v1net:
       n, c, h, w = net.shape
       net_tiled = net.repeat(self.timesteps, 1, 1, 1, 1).view(self.timesteps, n, c, h, w)
       net_tiled = torch.transpose(net_tiled, 1, 0)
       _, (net, _) = self.v1net_conv(net_tiled)
     net = self.resnet_conv_2(net)
-    net = torch.flatten(net, 1)
-    net = self.fc(net)
     return net
 
   def extract_layer(self, model, 
                     backbone_mode, 
                     key):
+    
+    import ipdb; ipdb.set_trace()
+
     if backbone_mode == 'resnet18':
       index_dict = {
-          'retina': (0,4), 
-          'cortex': (4,9),
+          'v1': (0,4), 
+          'v1+': (4,9)
       }
     start, end = index_dict[key]
     modified_model = nn.Sequential(*list(
