@@ -17,7 +17,7 @@ class _SimpleSegmentationModel(nn.Module):
         input_shape = x.shape[-2:]
         # contract: features is a dict of tensors
         features = self.backbone(x)
-        print(features)
+        print(features.shape)
 
         result = OrderedDict()
         x = features["out"]
