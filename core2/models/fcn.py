@@ -1,6 +1,6 @@
 from torch import nn
 
-from ._utils import _SimpleSegmentationModel
+from .base import _SimpleSegmentationModel
 
 
 __all__ = ["FCN"]

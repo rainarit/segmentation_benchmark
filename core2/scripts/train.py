@@ -9,6 +9,7 @@ from torch import nn
 import torchvision
 import os
 import sys
+                    
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
 root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
@@ -21,15 +22,13 @@ _LOG_DIR = root_path + "/segmentation_benchmark/core/models/runs/logs/"
 from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
 import segmentation_benchmark.core.utils.utils as utils
-
-
+from segmentation_benchmark.core.models.get_segmentation_model import _segm_model, _load_model
+from segmentation_benchmark.core.utils.score import SegmentationMetric
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
     paths = {
-        "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
-        "voc_aug": (dir_path, sbd, 21),
         "coco": (dir_path, get_coco, 21)
     }
     p, ds_fn, num_classes = paths[name]
@@ -122,14 +121,20 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-                                                                 aux_loss=args.aux_loss,
-                                                                 pretrained=args.pretrained)
+    model = _load_model(arch_type=args.model, 
+                        backbone=args.backbone, 
+                        pretrained=args.pretrained, 
+                        progress=True, 
+                        num_classes=num_classes, 
+                        aux_loss=args.aux_loss)
+    
     model.to(device)
+
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model_without_ddp = model
+
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
@@ -169,19 +174,7 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        checkpoint = {
-            'model': model_without_ddp.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'lr_scheduler': lr_scheduler.state_dict(),
-            'epoch': epoch,
-            'args': args
-        }
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'checkpoint.pth'))
+        
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -198,13 +191,13 @@ def parse_args():
     parser.add_argument('--backbone', default='resnet50', help='backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
-    parser.add_argument('-b', '--batch-size', default=4, type=int)
+    parser.add_argument('-b', '--batch-size', default=8, type=int)
     parser.add_argument('--epochs', default=30, type=int, metavar='N',
                         help='number of total epochs to run')
 
-    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
+    parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
                         help='number of data loading workers (default: 16)')
-    parser.add_argument('--lr', default=0.02, type=float, help='initial learning rate')
+    parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                         help='momentum')
     parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
@@ -246,6 +239,7 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
 
 if __name__ == "__main__":
     args = parse_args()

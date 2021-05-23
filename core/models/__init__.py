@@ -1,4 +1,3 @@
-from . import backbone
-from .base import *
+from .segmentation import *
 from .fcn import *
-from .get_segmentation_model import *
+from .resnet import *

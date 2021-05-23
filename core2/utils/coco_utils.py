@@ -3,13 +3,16 @@ import torch
 import torch.utils.data
 import torchvision
 from PIL import Image
-
 import os
+import sys
+
+
+from .utils import try_import_pycocotools
+try_import_pycocotools()
 
 from pycocotools import mask as coco_mask
 
-from transforms import Compose
-
+from .transforms import Compose
 
 class FilterAndRemapCocoCategories(object):
     def __init__(self, categories, remap=True):
