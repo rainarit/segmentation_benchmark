@@ -21,6 +21,7 @@ _LOG_DIR = root_path + "/segmentation_benchmark/core/models/runs/logs/"
 from segmentation_benchmark.core.utils.coco_utils import get_coco
 import segmentation_benchmark.core.utils.presets as presets
 import segmentation_benchmark.core.utils.utils as utils
+from segmentation_benchmark.core.models.segmentation import _load_model
 
 
 
@@ -125,6 +126,11 @@ def main(args):
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
+
+    model = _load_model(arch_type=args.model, 
+                        backbone=args.backbone, 
+                        pretrained=args.pretrained)
+
     model.to(device)
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -196,6 +202,7 @@ def parse_args():
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='fcn', help='model')
     parser.add_argument('--backbone', default='resnet50', help='backbone')
+    parser.add_argument('--pretrained', default=False, help='pretrained backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=4, type=int)
