@@ -302,9 +302,6 @@ def init_distributed_mode(args):
 import torch
 import numpy as np
 
-__all__ = ['SegmentationMetric', 'batch_pix_accuracy', 'batch_intersection_union',
-           'pixelAccuracy', 'intersectionAndUnion', 'hist_info', 'compute_score']
-
 
 class SegmentationMetric(object):
     """Computes pixAcc and mIoU metric scores
