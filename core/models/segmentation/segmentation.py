@@ -15,8 +15,8 @@ model_urls = {
 
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
-    if 'v1net' in backbone_name:
-        backbone = 
+    #if 'v1net' in backbone_name:
+    #    backbone = 
 
 
     if 'resnet' in backbone_name:
