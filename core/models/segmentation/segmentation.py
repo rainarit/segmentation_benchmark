@@ -42,7 +42,6 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
     model_map = {
         'fcn': (FCNHead, FCN),
     }
-    print(aux_classifier)
     classifier = model_map[name][0](out_inplanes, num_classes)
     base_model = model_map[name][1]
 
