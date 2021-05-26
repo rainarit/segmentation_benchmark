@@ -31,7 +31,7 @@ class RandomResize(object):
     def __init__(self, min_size, max_size=None):
         self.min_size = min_size
         if max_size is None:
-            max_size = min_size
+            max_size = min_size 
         self.max_size = max_size
 
     def __call__(self, image, target):
