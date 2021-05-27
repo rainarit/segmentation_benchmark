@@ -56,7 +56,7 @@ def criterion(inputs, target):
     return losses['out'] + 0.5 * losses['aux']
 
 
-def evaluate(model, data_loader, device, num_classes):
+def evaluate(model, data_loader, device, num_classes, metric_scorrer, best_pred):
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -67,7 +67,17 @@ def evaluate(model, data_loader, device, num_classes):
             output = model(image)
             output = output['out']
 
+            metric_scorrer.update(output, target)
+            pixAcc, mIoU = metric_scorrer.get()
+            print("Validation pixAcc: ", pixAcc)
+            print("mIoU: ", mIoU)
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
+
+        new_pred = (pixAcc + mIoU) / 2
+        if new_pred > best_pred:
+            best_pred = new_pred
+
         confmat.reduce_from_all_processes()
 
     return confmat
@@ -121,8 +131,14 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
+    metric = utils.SegmentationMetric(num_classes)
+    best_pred = 0.0
+
     model_name = str(args.model) + "_" + str(args.backbone)
-    model = segmentation_benchmark.core.models.segmentation.segmentation.__dict__[model_name](num_classes=num_classes, aux_loss=args.aux_loss, pretrained=args.pretrained)
+    #model = segmentation_benchmark.core.models.segmentation.segmentation.__dict__[model_name](num_classes=num_classes, aux_loss=args.aux_loss, pretrained=args.pretrained)
+    model = torchvision.models.segmentation.__dict__[model_name](num_classes=num_classes,
+                                                                 aux_loss=args.aux_loss,
+                                                                 pretrained=args.pretrained)
     model.to(device)
 
     if args.distributed:
@@ -166,7 +182,7 @@ def main(args):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, metric_scorrer=metric, best_pred=best_pred)
         print(confmat)
 
     total_time = time.time() - start_time
