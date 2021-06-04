@@ -1,6 +1,8 @@
 from .._utils import IntermediateLayerGetter
 from ..utils import load_state_dict_from_url
 from .. import resnet
+from .. import resnet_v1net
+from .. import v1net
 from .fcn import FCN, FCNHead
 
 
@@ -15,9 +17,12 @@ model_urls = {
 
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
-    #if 'v1net' in backbone_name:
-    #    backbone = 
-
+    if 'v1net' in backbone_name: 
+        backbone = resnet18_v1net(timesteps=3, 
+                                  num_classes=num_classes, 
+                                  kernel_size=5, 
+                                  kernel_size_inh=3, 
+                                  remove_v1net=False)
 
     if 'resnet' in backbone_name:
         backbone = resnet.__dict__[backbone_name](
