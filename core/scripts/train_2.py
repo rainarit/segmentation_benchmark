@@ -135,10 +135,10 @@ def main(args):
     best_pred = 0.0
 
     model_name = str(args.model) + "_" + str(args.backbone)
-    model = segmentation_benchmark.core.models.segmentation.segmentation.__dict__[model_name](num_classes=num_classes, aux_loss=args.aux_loss, pretrained=args.pretrained)
-    #model = torchvision.models.segmentation.__dict__[model_name](num_classes=num_classes,
-    #                                                             aux_loss=args.aux_loss,
-    #                                                             pretrained=args.pretrained)
+    #model = segmentation_benchmark.core.models.segmentation.segmentation.__dict__[model_name](num_classes=num_classes, aux_loss=args.aux_loss, pretrained=args.pretrained)
+    model = torchvision.models.segmentation.__dict__[model_name](num_classes=num_classes,
+                                                                 aux_loss=args.aux_loss,
+                                                                 pretrained=args.pretrained)
 
 
     model.to(device)
