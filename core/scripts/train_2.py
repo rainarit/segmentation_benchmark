@@ -139,9 +139,10 @@ def main(args):
     model = torchvision.models.segmentation.__dict__[model_name](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
-    print('Model built!')
 
     model.to(device)
+
+    print('Model built!')
 
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
