@@ -85,7 +85,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
 def main(args):
 
-    seed=12
+    seed=1234
 
 
     torch.manual_seed(seed)
