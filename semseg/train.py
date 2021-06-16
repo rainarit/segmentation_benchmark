@@ -13,21 +13,11 @@ import utils
 
 import os
 import sys
-                    
-
-#cur_path = os.path.abspath(os.path.dirname(__file__))
-#root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
-#sys.path.append(root_path)
-
-#_DATASET_DIR = root_path + "/segmentation_benchmark/coco/"
-
-
+                
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
     paths = {
-        "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
-        "voc_aug": (dir_path, sbd, 21),
         "coco": (dir_path, get_coco, 21)
     }
     p, ds_fn, num_classes = paths[name]
@@ -92,6 +82,20 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
 
 def main(args):
+
+    seed=12
+
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)  # Numpy module.
+    random.seed(seed)  # Python random module.
+    torch.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
+
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
