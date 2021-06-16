@@ -20,6 +20,7 @@ def main(config, resume):
 
     # DATA LOADERS
     train_loader = get_instance(dataloaders, 'train_loader', config)
+    print(train_loader)
     val_loader = get_instance(dataloaders, 'val_loader', config)
 
     # MODEL
