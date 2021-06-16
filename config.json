@@ -16,7 +16,7 @@
         "type": "COCO",
         "args":{
             "data_dir": "data/VOCtrainval_11-May-2012",
-            "batch_size": 8,
+            "batch_size": 4,
             "base_size": 400,
             "crop_size": 380,
             "augment": true,
@@ -31,10 +31,10 @@
     },
 
     "val_loader": {
-        "type": "VOC",
+        "type": "COCO",
         "args":{
             "data_dir": "data/VOCtrainval_11-May-2012",
-            "batch_size": 8,
+            "batch_size": 4,
             "crop_size": 480,
             "val": true,
             "split": "val",
