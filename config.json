@@ -50,7 +50,7 @@
     "loss": "CrossEntropyLoss2d",
     "ignore_index": 255,
     "lr_scheduler": {
-        "type": "Poly",
+        "type": "OneCycle",
         "args": {}
     },
 
