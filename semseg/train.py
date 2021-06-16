@@ -116,7 +116,6 @@ def main(args):
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     data_loader = torch.utils.data.DataLoader(dataset, 
-                                              shuffle = True, 
                                               sampler=train_sampler,
                                               batch_size=args.batch_size, 
                                               collate_fn=utils.collate_fn, 
