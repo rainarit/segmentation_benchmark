@@ -7,6 +7,7 @@ import torch.utils.data
 from torch import nn
 import torchvision
 import numpy as np
+import random
 
 from coco_utils import get_coco
 import presets
