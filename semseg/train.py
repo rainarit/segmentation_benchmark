@@ -83,16 +83,15 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
 
-def seed_torch(seed=1029):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+def seed_torch():
+    np.random.seed(0)
+    random.seed(0)
+    torch.manual_seed(0)
+    torch.cuda.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
+    torch.backends.cudnn.enabled = False
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.enabled = False
 
 def main(args):
 
@@ -116,15 +115,21 @@ def main(args):
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=0,
-        collate_fn=utils.collate_fn, drop_last=True)
+    data_loader = torch.utils.data.DataLoader(dataset, 
+                                              shuffle = True, 
+                                              sampler=train_sampler,
+                                              batch_size=args.batch_size, 
+                                              collate_fn=utils.collate_fn, 
+                                              drop_last=True,
+                                              worker_init_fn=np.random.seed(0), 
+                                              num_workers=0)
 
-    data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=0,
-        collate_fn=utils.collate_fn)
+    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
+                                                   batch_size=1,
+                                                   sampler=test_sampler, 
+                                                   num_workers=0,
+                                                   worker_init_fn=np.random.seed(0),
+                                                   collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
