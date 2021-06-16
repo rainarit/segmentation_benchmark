@@ -1,6 +1,6 @@
 import random
 import numpy as np
-import cv2
+#import cv2
 import torch
 from torch.utils.data import Dataset
 from PIL import Image
@@ -29,7 +29,7 @@ class BaseDataSet(Dataset):
         self.normalize = transforms.Normalize(mean, std)
         self.return_id = return_id
 
-        cv2.setNumThreads(0)
+        #cv2.setNumThreads(0)
 
     def _set_files(self):
         raise NotImplementedError

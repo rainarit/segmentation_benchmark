@@ -19,14 +19,8 @@
             "batch_size": 4,
             "base_size": 400,
             "crop_size": 380,
-            "augment": true,
-            "shuffle": true,
-            "scale": true,
-            "flip": true,
-            "rotate": true,
-            "blur": false,
             "split": "train_aug",
-            "num_workers": 8
+            "num_workers": 4
         }
     },
 
@@ -35,7 +29,8 @@
         "args":{
             "data_dir": "coco/val2017",
             "batch_size": 4,
-            "crop_size": 480,
+            "base_size": 400,
+            "crop_size": 380,
             "val": true,
             "split": "val",
             "num_workers": 4
