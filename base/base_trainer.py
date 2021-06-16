@@ -53,7 +53,7 @@ class BaseTrainer:
         else:
             trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = get_instance(torch.optim, 'optimizer', config, trainable_params)
-        self.lr_scheduler = getattr(utils.lr_scheduler, config['lr_scheduler']['type'])(self.optimizer, self.epochs, len(train_loader))
+        self.lr_scheduler = getattr(utils.lr_scheduler, config['lr_scheduler']['type'])(self.optimizer, self.epochs, len(train_loader), iters_per_epoch=100)
 
         # MONITORING
         self.monitor = cfg_trainer.get('monitor', 'off')
