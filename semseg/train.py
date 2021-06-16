@@ -85,17 +85,12 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
 def main(args):
 
-    seed=1234
+    torch.manual_seed(12)
+    torch.cuda.manual_seed(12)
+    np.random.seed(12)
+    random.seed(12)
 
-
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
-    np.random.seed(seed)  # Numpy module.
-    random.seed(seed)  # Python random module.
-    torch.manual_seed(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic=True
 
 
     if args.output_dir:
@@ -119,12 +114,12 @@ def main(args):
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
         sampler=train_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn, drop_last=True)
+        collate_fn=utils.collate_fn, drop_last=True, worker_init_fn=np.random.seed(12))
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn)
+        collate_fn=utils.collate_fn, worker_init_fn=np.random.seed(12))
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
