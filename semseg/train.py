@@ -83,15 +83,20 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
 
+def seed_torch(seed=1029):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.enabled = False
+
 def main(args):
 
-    torch.manual_seed(12)
-    torch.cuda.manual_seed(12)
-    np.random.seed(12)
-    random.seed(12)
-
-    torch.backends.cudnn.deterministic=True
-
+    seed_torch()
 
     if args.output_dir:
         utils.mkdir(args.output_dir)
@@ -113,13 +118,13 @@ def main(args):
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn, drop_last=True, worker_init_fn=np.random.seed(12))
+        sampler=train_sampler, num_workers=0,
+        collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn, worker_init_fn=np.random.seed(12))
+        sampler=test_sampler, num_workers=0,
+        collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
