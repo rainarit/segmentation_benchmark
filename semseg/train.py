@@ -6,6 +6,7 @@ import torch
 import torch.utils.data
 from torch import nn
 import torchvision
+import numpy as np
 
 from coco_utils import get_coco
 import presets
