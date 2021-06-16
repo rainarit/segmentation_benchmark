@@ -58,12 +58,13 @@ class BaseTrainer:
         else:
             trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = get_instance(torch.optim, 'optimizer', config, trainable_params)
+        print("LENGTH OF TRAIN DTASET:")
+        print(len(train_loader))
 
-        self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lambda x: (1 - x / (len(train_loader) * self.epochs)) ** 0.9)
 
-        #self.lr_scheduler = getattr(utils.lr_scheduler, config['lr_scheduler']['type'])(optimizer=self.optimizer, 
-        #                                                                                num_epochs=self.epochs, 
-        #                                                                                iters_per_epoch=len(train_loader))
+        self.lr_scheduler = getattr(utils.lr_scheduler, config['lr_scheduler']['type'])(optimizer=self.optimizer, 
+                                                                                        num_epochs=self.epochs, 
+                                                                                        iters_per_epoch=len(train_loader))
 
         # MONITORING
         self.monitor = cfg_trainer.get('monitor', 'off')
