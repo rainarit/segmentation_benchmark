@@ -4,7 +4,7 @@
     "use_synch_bn": false,
 
     "arch": {
-        "type": "FCN",
+        "type": "FCN8",
         "args": {
             "backbone": "resnet50",
             "freeze_bn": false,
