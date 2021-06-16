@@ -180,7 +180,7 @@ def get_args_parser(add_help=True):
     import argparse
     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
-    parser.add_argument('--data-path', default='segmentation_benchmark/coco/', help='dataset path')
+    parser.add_argument('--data-path', default='~/segmentation_benchmark/coco/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='fcn_resnet101', help='model')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
