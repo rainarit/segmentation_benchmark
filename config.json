@@ -19,7 +19,7 @@
             "batch_size": 4,
             "base_size": 400,
             "crop_size": 380,
-            "split": "train_aug",
+            "split": "train2017",
             "num_workers": 4
         }
     },
@@ -32,7 +32,7 @@
             "base_size": 400,
             "crop_size": 380,
             "val": true,
-            "split": "val",
+            "split": "val2017",
             "num_workers": 4
         }
     },
