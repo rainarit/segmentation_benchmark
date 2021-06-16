@@ -11,6 +11,16 @@ from coco_utils import get_coco
 import presets
 import utils
 
+import os
+import sys
+                    
+
+cur_path = os.path.abspath(os.path.dirname(__file__))
+root_path = os.path.split(os.path.split(os.path.split(cur_path)[0])[0])[0]
+sys.path.append(root_path)
+
+_DATASET_DIR = root_path + "/segmentation_benchmark/coco/"
+
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -180,7 +190,7 @@ def get_args_parser(add_help=True):
     import argparse
     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
-    parser.add_argument('--data-path', default='~/segmentation_benchmark/coco/', help='dataset path')
+    parser.add_argument('--data-path', default='coco/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='fcn_resnet101', help='model')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
