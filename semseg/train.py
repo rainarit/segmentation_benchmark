@@ -15,15 +15,6 @@ import utils
 
 import os
 import sys
-
-seed = 1
-torch.manual_seed(seed)
-np.random.seed(seed)
-random.seed(seed) 
-torch.cuda.manual_seed_all(seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.enabled = False
                 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -111,6 +102,8 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 def main(args):
+
+    seed_all(10)
 
     if args.output_dir:
         utils.mkdir(args.output_dir)
