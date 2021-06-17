@@ -103,8 +103,6 @@ def seed_worker(worker_id):
 
 def main(args):
 
-    seed_all(10)
-
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
@@ -118,7 +116,9 @@ def main(args):
 
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
-    
+
+    seed_all(10)
+
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
         sampler=train_sampler, num_workers=args.workers, 
@@ -160,6 +160,7 @@ def main(args):
 
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
+        seed_all(10)
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
