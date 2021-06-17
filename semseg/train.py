@@ -16,8 +16,10 @@ import utils
 import os
 import sys
 
-g = torch.Generator()
-g.manual_seed(0)
+seed = 3
+torch.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
                 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -109,30 +111,16 @@ def main(args):
     else:
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
-
-    np.random.seed(0)
-    random.seed(0)
-    torch.manual_seed(0)
-    torch.cuda.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
-    torch.backends.cudnn.enabled = False
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
     
-    data_loader = torch.utils.data.DataLoader(dataset, 
-                                              sampler=train_sampler,
-                                              batch_size=args.batch_size, 
-                                              collate_fn=utils.collate_fn, 
-                                              drop_last=True,
-                                              worker_init_fn=seed_worker, 
-                                              generator=g,
-                                              num_workers=0)
+    data_loader = torch.utils.data.DataLoader(
+        dataset, batch_size=args.batch_size,
+        sampler=train_sampler, num_workers=args.workers,
+        collate_fn=utils.collate_fn, drop_last=True)
 
-    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
-                                                   batch_size=1,
-                                                   sampler=test_sampler, 
-                                                   num_workers=0,
-                                                   collate_fn=utils.collate_fn)
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test, batch_size=1,
+        sampler=test_sampler, num_workers=args.workers,
+        collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
