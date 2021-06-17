@@ -19,7 +19,7 @@ import sys
 
 torch.set_deterministic(True)
 
-def seed_torch(seed=1029):
+def seed_torch(seed=42):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
