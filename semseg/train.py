@@ -16,12 +16,14 @@ import utils
 import os
 import sys
 
-seed = 0
-random.seed(seed)     # python random generator
-np.random.seed(seed)  # numpy random generator
+seed = 1
 torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed) 
+torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.enabled = False
                 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
