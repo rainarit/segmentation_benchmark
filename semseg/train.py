@@ -15,6 +15,9 @@ import utils
 
 import os
 import sys
+
+g = torch.Generator()
+g.manual_seed(0)
                 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -82,20 +85,12 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-
-def seed_torch():
-    np.random.seed(0)
-    random.seed(0)
-    torch.manual_seed(0)
-    torch.cuda.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
-    torch.backends.cudnn.enabled = False
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    numpy.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 def main(args):
-
-    seed_torch()
 
     if args.output_dir:
         utils.mkdir(args.output_dir)
@@ -115,19 +110,28 @@ def main(args):
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
+    np.random.seed(0)
+    random.seed(0)
+    torch.manual_seed(0)
+    torch.cuda.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
+    torch.backends.cudnn.enabled = False
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    
     data_loader = torch.utils.data.DataLoader(dataset, 
                                               sampler=train_sampler,
                                               batch_size=args.batch_size, 
                                               collate_fn=utils.collate_fn, 
                                               drop_last=True,
-                                              worker_init_fn=np.random.seed(0), 
+                                              worker_init_fn=seed_worker, 
+                                              generator=g,
                                               num_workers=0)
 
     data_loader_test = torch.utils.data.DataLoader(dataset_test, 
                                                    batch_size=1,
                                                    sampler=test_sampler, 
                                                    num_workers=0,
-                                                   worker_init_fn=np.random.seed(0),
                                                    collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
