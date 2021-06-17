@@ -134,9 +134,6 @@ def main(args):
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model_without_ddp = model
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-        model_without_ddp = model.module
 
     params_to_optimize = [
         {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
@@ -153,14 +150,6 @@ def main(args):
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
-    if args.resume:
-        checkpoint = torch.load(args.resume, map_location='cpu')
-        model_without_ddp.load_state_dict(checkpoint['model'], strict=not args.test_only)
-        if not args.test_only:
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-            args.start_epoch = checkpoint['epoch'] + 1
-
     if args.test_only:
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
@@ -173,19 +162,6 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        checkpoint = {
-            'model': model_without_ddp.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'lr_scheduler': lr_scheduler.state_dict(),
-            'epoch': epoch,
-            'args': args
-        }
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'checkpoint.pth'))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
