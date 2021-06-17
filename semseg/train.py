@@ -15,6 +15,19 @@ import utils
 
 import os
 import sys
+
+def seed_torch(seed=1029):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    torch.backends.cudnn.enabled = False
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
+seed_torch()
                 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -82,24 +95,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-def seed_all(seed):
-    if not seed:
-        seed = 10
-
-    print("[ Using Seed : ", seed, " ]")
-
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.cuda.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
+def _init_fn(worker_id):
+    np.random.seed(42 + worker_id)
 
 def main(args):
 
@@ -117,19 +114,17 @@ def main(args):
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    seed_all(10)
-
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=args.workers, 
-        worker_init_fn=seed_worker,
+        sampler=train_sampler, num_workers=args.workers, shuffle=True,
+        worker_init_fn=_init_fn,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers, 
-        worker_init_fn=seed_worker,
-        collate_fn=utils.collate_fn)
+        sampler=test_sampler, num_workers=args.workers, shuffle=False,
+        worker_init_fn=_init_fn,
+        collate_fn=utils.collate_fn, drop_last=False)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
@@ -160,7 +155,6 @@ def main(args):
 
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
-        seed_all(10)
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
