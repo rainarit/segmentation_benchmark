@@ -130,29 +130,27 @@ def main(args):
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        num_workers=args.workers, shuffle=True,
+        num_workers=args.workers,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        num_workers=args.workers, shuffle=False,
+        num_workers=args.workers,
         worker_init_fn=seed_worker, generator=g,
-        collate_fn=utils.collate_fn, drop_last=False)
+        collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
     model.to(device)
 
-    model_without_ddp = model
-
     params_to_optimize = [
-        {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
-        {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
+        {"params": [p for p in model.backbone.parameters() if p.requires_grad]},
+        {"params": [p for p in model.classifier.parameters() if p.requires_grad]},
     ]
     if args.aux_loss:
-        params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
+        params = [p for p in model.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
     optimizer = torch.optim.SGD(
         params_to_optimize,
