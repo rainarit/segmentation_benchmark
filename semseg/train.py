@@ -17,7 +17,7 @@ import os
 import sys
 
 
-torch.use_deterministic_algorithms(True)
+torch.set_deterministic(True)
 
 def seed_torch(seed=1029):
     random.seed(seed)
