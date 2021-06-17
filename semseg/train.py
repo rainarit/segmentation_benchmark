@@ -93,7 +93,11 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         torch.set_deterministic(True)
 
         optimizer.zero_grad()
+
+        torch.set_deterministic(False)
         loss.backward()
+        torch.set_deterministic(True)
+        
         optimizer.step()
 
         lr_scheduler.step()
