@@ -16,6 +16,9 @@ import utils
 import os
 import sys
 
+
+torch.use_deterministic_algorithms(True)
+
 def seed_torch(seed=1029):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -95,8 +98,13 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-def _init_fn(worker_id):
-    np.random.seed(42 + worker_id)
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    numpy.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+g = torch.Generator()
+g.manual_seed(0)
 
 def main(args):
 
@@ -117,13 +125,13 @@ def main(args):
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
         num_workers=args.workers, shuffle=True,
-        worker_init_fn=_init_fn,
+        worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
         num_workers=args.workers, shuffle=False,
-        worker_init_fn=_init_fn,
+        worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=False)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
