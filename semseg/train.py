@@ -91,6 +91,20 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
+def seed_all(seed):
+    if not seed:
+        seed = 10
+
+    print("[ Using Seed : ", seed, " ]")
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.cuda.manual_seed(seed)
+    numpy.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
     numpy.random.seed(worker_seed)
@@ -118,12 +132,14 @@ def main(args):
     
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=args.workers,
+        sampler=train_sampler, num_workers=args.workers, 
+        worker_init_fn=seed_worker,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
+        sampler=test_sampler, num_workers=args.workers, 
+        worker_init_fn=seed_worker,
         collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
