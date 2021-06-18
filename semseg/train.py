@@ -88,14 +88,14 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
-    for image, target in metric_logger.log_every(data_loader, print_freq, header):
+    for i, image, target in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         image, target = image.to(device), target.to(device)
         output = model(image)
         torch.set_deterministic(False)
         loss = criterion(output, target)
         torch.set_deterministic(True)
 
-        writer.add_scalar("Loss/train", loss, epoch)
+        writer.add_scalar("Loss/train", loss, i)
 
         optimizer.zero_grad()
 
