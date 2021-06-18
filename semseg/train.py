@@ -128,11 +128,8 @@ def main(args):
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    indices = torch.arange(1000)
-    dataset_1k = torch.utils.data.Subset(dataset, indices)
-
     data_loader = torch.utils.data.DataLoader(
-        dataset_1k, batch_size=args.batch_size,
+        dataset, batch_size=args.batch_size,
         num_workers=args.workers,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
