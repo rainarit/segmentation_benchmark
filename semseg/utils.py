@@ -74,6 +74,9 @@ class ConfusionMatrix(object):
     def __init__(self, num_classes):
         self.num_classes = num_classes
         self.mat = None
+        self.acc_global = None
+        self.acc = None
+        self.iu = None
 
     def update(self, a, b):
         n = self.num_classes
@@ -106,6 +109,8 @@ class ConfusionMatrix(object):
 
     def __str__(self):
         acc_global, acc, iu = self.compute()
+        self.acc_global = acc_global.item() * 100
+        self.iu = iu.mean().item() * 100
         return (
             'global correct: {:.1f}\n'
             'average row correct: {}\n'

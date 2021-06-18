@@ -172,6 +172,7 @@ def main(args):
     if args.test_only:
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
+        print(confmat.iu)
         return
 
     start_time = time.time()
