@@ -90,7 +90,7 @@ class ConfusionMatrix(object):
     def reset(self):
         self.mat.zero_()
 
-    def replacenan(t):
+    def replacenan(self, t):
         return tf.where(tf.is_nan(t), tf.zeros_like(t), t)
 
     def compute(self):
@@ -99,7 +99,7 @@ class ConfusionMatrix(object):
         acc = torch.diag(h) / h.sum(1)
         iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
 
-        iu = replacenan(iu)
+        iu = self.replacenan(iu)
         return acc_global, acc, iu
 
     def reduce_from_all_processes(self):
