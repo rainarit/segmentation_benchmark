@@ -94,7 +94,7 @@ class ConfusionMatrix(object):
         h = self.mat.float()
         acc_global = torch.diag(h).sum() / h.sum()
         acc = torch.diag(h) / h.sum(1)
-        print(torch.diag(h))
+        print(h.sum(0))
         iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
         return acc_global, acc, iu
 
