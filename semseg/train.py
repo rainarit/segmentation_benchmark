@@ -112,7 +112,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
-    
+        print(confmat_train)
         writer.add_scalar("Mean IoU/train", confmat_train.iu, i)
         writer.add_scalar("Pixel Accuracy/train", confmat_train.acc_global, i)
         writer.flush()
