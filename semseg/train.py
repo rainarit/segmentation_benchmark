@@ -109,7 +109,15 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Learning rate", optimizer.param_groups[0]["lr"], i)
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+
+        confmat_train = utils.ConfusionMatrix(21)
+        confmat_train.update(target.flatten(), output.argmax(1).flatten())
+    
+        writer.add_scalar("Mean IoU/train", confmat_train.iu, i)
+        writer.add_scalar("Pixel Accuracy/train", confmat_train.acc_global, i)
         writer.flush()
+
+    confmat_train.reduce_from_all_processes()
 
 
 def seed_worker(worker_id):
@@ -177,8 +185,8 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        writer.add_scalar("Mean IoU", confmat.iu, epoch)
-        writer.add_scalar("Pixel Accuracy", confmat.acc_global, epoch)
+        writer.add_scalar("Mean IoU/val", confmat.iu, epoch)
+        writer.add_scalar("Pixel Accuracy/val", confmat.acc_global, epoch)
         writer.flush()
 
     total_time = time.time() - start_time
