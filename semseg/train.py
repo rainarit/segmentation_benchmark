@@ -110,6 +110,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
         writer.flush()
+        break
 
 
 def seed_worker(worker_id):
@@ -134,7 +135,7 @@ def main(args):
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     data_loader = torch.utils.data.DataLoader(
-        torch.utils.data.Subset(dataset, list(range(0, 100))), batch_size=args.batch_size,
+        dataset, batch_size=args.batch_size,
         num_workers=args.workers, sampler=train_sampler,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
