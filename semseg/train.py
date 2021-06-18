@@ -77,6 +77,7 @@ def evaluate(model, data_loader, device, num_classes):
             output = output['out']
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
+            break
 
         confmat.reduce_from_all_processes()
 
