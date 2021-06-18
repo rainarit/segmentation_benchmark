@@ -126,13 +126,13 @@ def main(args):
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        num_workers=args.workers,
+        num_workers=args.workers, sampler=train_sampler,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        num_workers=args.workers,
+        num_workers=args.workers, sampler=test_sampler,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn)
 
