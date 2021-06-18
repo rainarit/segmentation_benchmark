@@ -16,22 +16,21 @@ import utils
 import os
 import sys
 
-
+seed=42
+random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+torch.backends.cudnn.enabled = False
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
 torch.set_deterministic(True)
 
-def seed_torch(seed=42):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-    torch.backends.cudnn.enabled = False
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-
-seed_torch()
-                
+g = torch.Generator()
+g.manual_seed(0)
+    
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
@@ -108,9 +107,6 @@ def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
-
-g = torch.Generator()
-g.manual_seed(0)
 
 def main(args):
 
@@ -220,7 +216,6 @@ def get_args_parser(add_help=True):
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
 
     return parser
-
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
