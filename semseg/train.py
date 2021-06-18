@@ -145,16 +145,18 @@ def main(args):
         {"params": [p for p in model.backbone.parameters() if p.requires_grad]},
         {"params": [p for p in model.classifier.parameters() if p.requires_grad]},
     ]
+
     if args.aux_loss:
         params = [p for p in model.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
-    optimizer = torch.optim.SGD(
-        params_to_optimize,
-        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
+    optimizer = torch.optim.SGD(params_to_optimize,
+                                lr=args.lr, 
+                                momentum=args.momentum, 
+                                weight_decay=args.weight_decay)
+
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                                     lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
     if args.test_only:
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
@@ -210,10 +212,6 @@ def get_args_parser(add_help=True):
         help="Use pre-trained models from the modelzoo",
         action="store_true",
     )
-    # distributed training parameters
-    parser.add_argument('--world-size', default=1, type=int,
-                        help='number of distributed processes')
-    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
 
     return parser
 
