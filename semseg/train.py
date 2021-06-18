@@ -111,7 +111,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
         confmat_train = utils.ConfusionMatrix(21)
-        confmat_train.update(target.flatten(), output.argmax(1).flatten())
+        confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
     
         writer.add_scalar("Mean IoU/train", confmat_train.iu, i)
         writer.add_scalar("Pixel Accuracy/train", confmat_train.acc_global, i)
