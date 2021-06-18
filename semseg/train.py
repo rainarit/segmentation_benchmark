@@ -77,7 +77,6 @@ def evaluate(model, data_loader, device, num_classes):
             output = output['out']
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
-            break
 
         confmat.reduce_from_all_processes()
 
@@ -106,12 +105,11 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         lr_scheduler.step()
 
-        writer.add_scalar("Loss/train", loss, i)
+        writer.add_scalar("Loss/train", loss.item()[1], i)
         writer.add_scalar("Learning rate", optimizer.param_groups[0]["lr"], i)
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
         writer.flush()
-        break
 
 
 def seed_worker(worker_id):
@@ -178,9 +176,10 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
-
         print(confmat)
-        print(confmat.iu)
+        writer.add_scalar("Mean IoU", confmat.iu, epoch)
+        writer.add_scalar("Pixel Accuracy", confmat.acc_global, epoch)
+        writer.flush()
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
