@@ -103,6 +103,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         lr_scheduler.step()
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+        break
 
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
