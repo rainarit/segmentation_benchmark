@@ -16,6 +16,10 @@ import utils
 import os
 import sys
 
+import torch
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+
 seed=42
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
@@ -90,6 +94,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         torch.set_deterministic(False)
         loss = criterion(output, target)
         torch.set_deterministic(True)
+
+        writer.add_scalar("Loss/train", loss, epoch)
 
         optimizer.zero_grad()
 
@@ -166,6 +172,7 @@ def main(args):
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
+        writer.flush()
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
 
