@@ -129,7 +129,7 @@ def main(args):
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     indices = torch.arange(1000)
-    dataset_1k = data_utils.Subset(dataset, indices)
+    dataset_1k = torch.utils.data.Subset(dataset, indices)
 
     data_loader = torch.utils.data.DataLoader(
         dataset_1k, batch_size=args.batch_size,
