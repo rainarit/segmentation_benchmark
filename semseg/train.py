@@ -134,7 +134,7 @@ def main(args):
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     data_loader = torch.utils.data.DataLoader(
-        torch.utils.data.Subset(dataset, 1000), batch_size=args.batch_size,
+        torch.utils.data.random_split(dataset, 1000), batch_size=args.batch_size,
         num_workers=args.workers, sampler=train_sampler,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
