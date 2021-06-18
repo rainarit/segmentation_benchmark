@@ -134,7 +134,7 @@ def main(args):
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=args.batch_size,
+        0.1*dataset, batch_size=args.batch_size,
         num_workers=args.workers, sampler=train_sampler,
         worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
@@ -176,6 +176,7 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
+
         print(confmat)
 
     total_time = time.time() - start_time
