@@ -95,8 +95,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         loss = criterion(output, target)
         torch.set_deterministic(True)
 
-        writer.add_scalar("Loss/train", loss, i)
-
         optimizer.zero_grad()
 
         torch.set_deterministic(False)
@@ -106,6 +104,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         optimizer.step()
 
         lr_scheduler.step()
+
+        writer.add_scalar("Loss/train", loss, i)
+        writer.add_scalar("Learning rate", optimizer.param_groups[0]["lr"], i)
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
         writer.flush()
