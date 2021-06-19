@@ -52,6 +52,18 @@ def get_dataset(dir_path, name, image_set, transform):
     return ds, num_classes
 
 
+def get_mask(output):
+    output_predictions = output['out'][0].argmax(0)
+    # create a color pallette, selecting a color for each class
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    colors = (colors % 255).numpy().astype("uint8")
+    # plot the semantic segmentation predictions of 21 classes in each color
+    r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
+    r.putpalette(colors)
+    return np.array(r.convert('RGB'))
+
+
 def get_transform(train):
     base_size = 520
     crop_size = 480
@@ -69,41 +81,6 @@ def criterion(inputs, target):
 
     return losses['out'] + 0.5 * losses['aux']
 
-# helper functions
-
-def images_to_probs(net, images):
-    '''
-    Generates predictions and corresponding probabilities from a trained
-    network and a list of images
-    '''
-    output = net(images)
-    # convert output probabilities to predicted class
-    _, preds_tensor = torch.max(output, 1)
-    preds = np.squeeze(preds_tensor.numpy())
-    return preds, [F.softmax(el, dim=0)[i].item() for i, el in zip(preds, output)]
-
-
-def plot_classes_preds(net, images, labels):
-    '''
-    Generates matplotlib Figure using a trained network, along with images
-    and labels from a batch, that shows the network's top prediction along
-    with its probability, alongside the actual label, coloring this
-    information based on whether the prediction was correct or not.
-    Uses the "images_to_probs" function.
-    '''
-    preds, probs = images_to_probs(net, images)
-    # plot the images in the batch, along with predicted and true labels
-    fig = plt.figure(figsize=(12, 48))
-    for idx in np.arange(4):
-        ax = fig.add_subplot(1, 4, idx+1, xticks=[], yticks=[])
-        matplotlib_imshow(images[idx], one_channel=True)
-        ax.set_title("{0}, {1:.1f}%\n(label: {2})".format(
-            classes[preds[idx]],
-            probs[idx] * 100.0,
-            classes[labels[idx]]),
-                    color=("green" if preds[idx]==labels[idx].item() else "red"))
-    return fig
-
 def evaluate(model, data_loader, device, num_classes):
     global val_step
 
@@ -115,18 +92,10 @@ def evaluate(model, data_loader, device, num_classes):
         for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
             output = model(image)
+            writer.add_image('Images/val', get_mask(output), val_step, dataformats='HWC')
+
             output = output['out']
 
-            output_predictions = output[0].argmax(0)
-            # create a color pallette, selecting a color for each class
-            palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-            colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-            colors = (colors % 255).numpy().astype("uint8")
-            # plot the semantic segmentation predictions of 21 classes in each color
-            r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
-            r.putpalette(colors)
-
-            writer.add_image('Images/val', np.array(r.convert('RGB')), val_step, dataformats='HWC')
             val_step = val_step + 1
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
@@ -138,7 +107,6 @@ def evaluate(model, data_loader, device, num_classes):
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
     global train_step
-    global running_loss
 
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -163,17 +131,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        #writer.add_scalar("Loss/train", loss.item(), train_step)
-        running_loss += loss.item()
-        if train_step == 50:    # every 1000 mini-batches...
-            # ...log the running loss
-            writer.add_scalar('training loss', running_loss / 1000, epoch * len(data_loader) + train_step)
-
-            # ...log a Matplotlib Figure showing the model's predictions on a
-            # random mini-batch
-            writer.add_figure('predictions vs. actuals', plot_classes_preds(model, image, target), global_step=epoch * len(data_loader) + train_step)
-
-        running_loss = 0.0
+        writer.add_scalar("Loss/train", loss.item(), train_step)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
@@ -182,17 +140,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
-        
-        output_predictions = output['out'][0].argmax(0)
-        # create a color pallette, selecting a color for each class
-        palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-        colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-        colors = (colors % 255).numpy().astype("uint8")
-        # plot the semantic segmentation predictions of 21 classes in each color
-        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
-        r.putpalette(colors)
-
-        writer.add_image('Images/train', np.array(r.convert('RGB')), train_step, dataformats='HWC')
+        writer.add_image('Images/train', get_mask(output), train_step, dataformats='HWC')
 
         train_step = train_step + 1
         writer.flush()
