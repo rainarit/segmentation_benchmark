@@ -79,6 +79,17 @@ def evaluate(model, data_loader, device, num_classes):
             output = model(image)
             output = output['out']
 
+            output_predictions = output[0].argmax(0)
+            # create a color pallette, selecting a color for each class
+            palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+            colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+            colors = (colors % 255).numpy().astype("uint8")
+            # plot the semantic segmentation predictions of 21 classes in each color
+            r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
+            r.putpalette(colors)
+
+            writer.add_image('Images/val', np.array(r.convert('RGB')), step, dataformats='HWC')
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
         confmat.reduce_from_all_processes()
@@ -130,9 +141,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
         r.putpalette(colors)
 
-
-        #writer.add_image('train_image', output['out'][0].argmax(0), dataformats='HW')
-        writer.add_image('train_image', np.array(r.convert('RGB')), step, dataformats='HWC')
+        writer.add_image('Images/train', np.array(r.convert('RGB')), step, dataformats='HWC')
 
         step = step + 1
         writer.flush()
