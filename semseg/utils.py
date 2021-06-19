@@ -124,7 +124,7 @@ class ConfusionMatrix(object):
 
 class MetricLogger(object):
     def __init__(self, delimiter="\t"):
-        self.meters = defaultdict()
+        self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
 
     def update(self, **kwargs):
