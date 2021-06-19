@@ -127,13 +127,13 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
         colors = (colors % 255).numpy().astype("uint8")
         # plot the semantic segmentation predictions of 21 classes in each color
-        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize(480,480)
+        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
         r.putpalette(colors)
 
 
 
         #writer.add_image('train_image', output['out'][0].argmax(0), dataformats='HW')
-        writer.add_image('train_image', torch.tensor(r), dataformats='HW')
+        writer.add_image('train_image', torch.tensor(r), step, dataformats='HW')
 
         step = step + 1
         writer.flush()
