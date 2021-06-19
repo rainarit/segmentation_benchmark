@@ -108,11 +108,10 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         lr_scheduler.step()
 
-        writer.add_scalar("Loss/train", loss.item(), step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], step)
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        print(metric_logger[0])
+        writer.add_scalar("Loss/train", loss.item(), step)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
