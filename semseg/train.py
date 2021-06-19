@@ -91,7 +91,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
-    for i, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for image, target in metric_logger.log_every(data_loader, print_freq, header):
         image, target = image.to(device), target.to(device)
         output = model(image)
         #torch.set_deterministic(False)
@@ -119,10 +119,10 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
+
+
         step = step + 1
         writer.flush()
-        if (i == 50):
-            break
 
     confmat_train.reduce_from_all_processes()
 
@@ -192,6 +192,7 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
+        
         writer.add_scalar("Mean IoU/val", confmat.iu, epoch)
         writer.add_scalar("Pixel Accuracy/val", confmat.acc_global, epoch)
         writer.flush()
