@@ -133,7 +133,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
 
         #writer.add_image('train_image', output['out'][0].argmax(0), dataformats='HW')
-        writer.add_image('train_image', torch.tensor(r), step, dataformats='HW')
+        writer.add_image('train_image', torch.from_numpy(np.array(r)), step, dataformats='HW')
 
         step = step + 1
         writer.flush()
