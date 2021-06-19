@@ -105,8 +105,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         lr_scheduler.step()
 
-        writer.add_scalar("Loss/train", loss.item(), i)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], i)
+        writer.add_scalar("Loss/train", loss.item())
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"])
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
