@@ -130,11 +130,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480, 540))
         r.putpalette(colors)
 
-        print(output_predictions)
 
 
-
-        writer.add_image('train_image', np.array(r), step)
+        writer.add_image('train_image', np.array(output['out'][0]), step)
 
         step = step + 1
         writer.flush()
