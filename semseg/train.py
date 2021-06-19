@@ -127,10 +127,11 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
         colors = (colors % 255).numpy().astype("uint8")
         # plot the semantic segmentation predictions of 21 classes in each color
-        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((3, 540,480))
+        print(tuple(image.size))
+        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize(image.size)
         r.putpalette(colors)
 
-        print(np.array(r).shape)
+        print(r.shape)
 
 
 
