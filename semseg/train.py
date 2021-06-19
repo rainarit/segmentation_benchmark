@@ -121,7 +121,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
 
-        writer.add_image('train_image', output['out'].argmax(1).permute(1, 2, 0))
+        writer.add_image('train_image', output['out'].argmax(1).flatten())
 
         step = step + 1
         writer.flush()
