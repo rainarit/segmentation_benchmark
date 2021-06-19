@@ -128,7 +128,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         colors = (colors % 255).numpy().astype("uint8")
         # plot the semantic segmentation predictions of 21 classes in each color
         print(tuple(image.size()))
-        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize(image.size)
+        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize(tuple(image.size()))
         r.putpalette(colors)
 
         print(r.shape)
