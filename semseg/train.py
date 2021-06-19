@@ -8,7 +8,7 @@ from torch import nn
 import torchvision
 import numpy as np
 import random
-from torchvision import transforms.functional as F
+from torchvision.transforms import functional as F
 
 from coco_utils import get_coco
 import presets
