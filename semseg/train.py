@@ -20,7 +20,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-ITER_1 = 0
+global step = 0
 
 seed=42
 random.seed(seed)
@@ -107,8 +107,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         lr_scheduler.step()
 
-        writer.add_scalar("Loss/train", loss.item(), ITER_1)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], ITER_1)
+        writer.add_scalar("Loss/train", loss.item(), step)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], step)
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -116,9 +116,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, ITER_1)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, ITER_1)
-        ITER_1 = ITER_1 + 1
+        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, step)
+        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
+        step = step + 1
         writer.flush()
         if (i == 50):
             break
