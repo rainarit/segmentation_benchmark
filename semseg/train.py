@@ -8,7 +8,7 @@ from torch import nn
 import torchvision
 import numpy as np
 import random
-from torchvision.transforms import functional as F
+from PIL import Image
 
 from coco_utils import get_coco
 import presets
@@ -121,7 +121,18 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
 
-        writer.add_image('train_image', output['out'].argmax(1))
+        output_predictions = output.argmax(0)
+        # create a color pallette, selecting a color for each class
+        palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+        colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+        colors = (colors % 255).numpy().astype("uint8")
+        # plot the semantic segmentation predictions of 21 classes in each color
+        r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize(input_image.size)
+        r.putpalette(colors)
+
+
+
+        writer.add_image('train_image', r, step)
 
         step = step + 1
         writer.flush()
