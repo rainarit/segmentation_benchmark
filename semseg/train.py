@@ -8,6 +8,7 @@ from torch import nn
 import torchvision
 import numpy as np
 import random
+from torchvision import transforms.functional as F
 
 from coco_utils import get_coco
 import presets
@@ -120,7 +121,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
 
-        writer.add_image('train_image', output)
+        writer.add_image('train_image', F.to_pil_image(output))
 
         step = step + 1
         writer.flush()
