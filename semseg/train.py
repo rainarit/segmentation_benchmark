@@ -122,7 +122,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
         
         output_predictions = output['out'][0].argmax(0)
-        print(output_predictions.shape)
         # create a color pallette, selecting a color for each class
         palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
         colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
@@ -131,11 +130,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
         r.putpalette(colors)
 
-        print(np.array(r).shape)
-
 
         #writer.add_image('train_image', output['out'][0].argmax(0), dataformats='HW')
-        writer.add_image('train_image', torch.from_numpy(np.array(r)), step, dataformats='HW')
+        writer.add_image('train_image', np.array(r), step, dataformats='HW')
 
         step = step + 1
         writer.flush()
