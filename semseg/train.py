@@ -132,7 +132,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
 
 
-        writer.add_image('train_image', r, step)
+        writer.add_image('train_image', output_predictions.byte().cpu().numpy(), step)
 
         step = step + 1
         writer.flush()
