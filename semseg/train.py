@@ -110,7 +110,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         writer.add_scalar("Loss/train", loss.item(), step)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], step)
-
+        print(loss.item())
+        print(loss)
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
         confmat_train = utils.ConfusionMatrix(21)
@@ -123,6 +124,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         step = step + 1
         writer.flush()
+        break
 
     confmat_train.reduce_from_all_processes()
 
@@ -192,7 +194,7 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        
+
         writer.add_scalar("Mean IoU/val", confmat.iu, epoch)
         writer.add_scalar("Pixel Accuracy/val", confmat.acc_global, epoch)
         writer.flush()
