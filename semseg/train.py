@@ -21,7 +21,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-step = 0
+train_step = 0
+val_step = 0
 
 seed=42
 random.seed(seed)
@@ -69,6 +70,8 @@ def criterion(inputs, target):
 
 
 def evaluate(model, data_loader, device, num_classes):
+    global val_step
+
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -88,7 +91,8 @@ def evaluate(model, data_loader, device, num_classes):
             r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
             r.putpalette(colors)
 
-            writer.add_image('Images/val', np.array(r.convert('RGB')), step, dataformats='HWC')
+            writer.add_image('Images/val', np.array(r.convert('RGB')), val_step, dataformats='HWC')
+            val_step = val_step + 1
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
@@ -98,7 +102,7 @@ def evaluate(model, data_loader, device, num_classes):
 
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
-    global step
+    global train_step
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
@@ -122,15 +126,15 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        writer.add_scalar("Loss/train", loss.item(), step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], step)
+        writer.add_scalar("Loss/train", loss.item(), train_step)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, step)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, step)
+        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
+        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
         
         output_predictions = output['out'][0].argmax(0)
         # create a color pallette, selecting a color for each class
@@ -141,9 +145,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
         r.putpalette(colors)
 
-        writer.add_image('Images/train', np.array(r.convert('RGB')), step, dataformats='HWC')
+        writer.add_image('Images/train', np.array(r.convert('RGB')), train_step, dataformats='HWC')
 
-        step = step + 1
+        train_step = train_step + 1
         writer.flush()
 
     confmat_train.reduce_from_all_processes()
