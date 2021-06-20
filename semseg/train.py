@@ -35,7 +35,7 @@ torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
 torch.backends.cudnn.enabled = False
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-torch.set_deterministic(True)
+#torch.set_deterministic(True)
 
 g = torch.Generator()
 g.manual_seed(0)
@@ -115,21 +115,21 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
         image, target = image.to(device), target.to(device)
         output = model(image)
-        torch.set_deterministic(False)
+        #torch.set_deterministic(False)
         loss = criterion(output, target)
-        torch.set_deterministic(True)
+        #torch.set_deterministic(True)
 
         optimizer.zero_grad()
 
-        torch.set_deterministic(False)
+        #torch.set_deterministic(False)
         loss.backward()
-        torch.set_deterministic(True)
+        #torch.set_deterministic(True)
         
         optimizer.step()
 
-        lr_scheduler.step()
-
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+
+        lr_scheduler.step()
 
         writer.add_scalar("Loss/train", loss.item(), train_step)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], train_step)
