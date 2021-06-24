@@ -113,16 +113,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
 
-        # create a color pallette, selecting a color for each class
-        palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-        colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-        colors = (colors % 255).numpy().astype("uint8")
-        # plot the semantic segmentation predictions of 21 classes in each color
-        r = Image.fromarray(target.byte().cpu().numpy()).resize((480,480))
-        r.putpalette(colors)
-        r = np.array(r.convert('RGB'))
-        print(r.shape)
-
         print(image.shape)
         print(target.shape)
 
