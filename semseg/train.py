@@ -183,6 +183,8 @@ def main(args):
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
+    import ipdb
+    ipdb.set_trace()
     model.to(device)
 
     params_to_optimize = [
