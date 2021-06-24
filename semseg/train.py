@@ -139,7 +139,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
-        writer.add_image('Images/train', get_mask(output), train_step, dataformats='HWC')
+        writer.add_image('Images/train_original', image, train_step, dataformats='HWC')
+        writer.add_image('Images/train_prediction', get_mask(output), train_step, dataformats='HWC')
+        writer.add_image('Images/train_truth', target, train_step, dataformats='HWC')
 
         train_step = train_step + 1
         writer.flush()
