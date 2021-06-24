@@ -123,6 +123,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         r = np.array(r.convert('RGB'))
         print(r.shape)
 
+        print(image.shape)
+        print(target.shape)
+
         img = np.reshape(image[0], (-1, 480, 480, 3))
         writer.add_image('Images/train_original', img, train_step, dataformats='NHWC')
         writer.add_image('Images/train_truth', r, train_step, dataformats='NHWC')
