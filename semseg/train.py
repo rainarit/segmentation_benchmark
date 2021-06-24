@@ -112,6 +112,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
+        print(type(image))
+        writer.add_image('Images/train_original', image, train_step, dataformats='HWC')
         image, target = image.to(device), target.to(device)
         output = model(image)
         #torch.set_deterministic(False)
@@ -139,7 +141,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
-        writer.add_image('Images/train_original', image, train_step, dataformats='HWC')
         writer.add_image('Images/train_prediction', get_mask(output), train_step, dataformats='HWC')
         writer.add_image('Images/train_truth', target, train_step, dataformats='HWC')
 
