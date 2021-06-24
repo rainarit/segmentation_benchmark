@@ -26,18 +26,18 @@ val_step = 0
 running_loss = 0.0
 
 seed=42
-random.seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
-np.random.seed(seed)
+#random.seed(seed)
+#os.environ['PYTHONHASHSEED'] = str(seed)
+#np.random.seed(seed)
 
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
+#torch.manual_seed(seed)
+#torch.cuda.manual_seed(seed)
+#torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+#torch.backends.cudnn.benchmark = False
+#torch.backends.cudnn.deterministic = True
 
-g = torch.Generator()
-g.manual_seed(42)
+#g = torch.Generator()
+#g.manual_seed(42)
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -171,13 +171,11 @@ def main(args):
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
         num_workers=args.workers, sampler=train_sampler,
-        worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
         num_workers=args.workers, sampler=test_sampler,
-        worker_init_fn=seed_worker, generator=g,
         collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
