@@ -25,20 +25,19 @@ train_step = 0
 val_step = 0
 running_loss = 0.0
 
-seed=0
+seed=42
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
 np.random.seed(seed)
+
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-torch.backends.cudnn.enabled = False
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-#torch.set_deterministic(True)
 
 g = torch.Generator()
-g.manual_seed(0)
+g.manual_seed(42)
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
