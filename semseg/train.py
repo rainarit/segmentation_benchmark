@@ -113,13 +113,12 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
 
-        print(image[:3].shape)
-        print(target.shape)
-
         #writer.add_image('Images/train_original', image, train_step, dataformats='NCWH')
         #writer.add_image('Images/train_truth', r, train_step, dataformats='NHWC')
         image, target = image.to(device), target.to(device)
-        writer.add_image('Images/train_original', image, train_step, dataformats='NCWH')
+
+        img = np.reshape(image[0], (-1, 480, 480, 3))
+        writer.add_image('Images/train_original', img, train_step, dataformats='NCWH')
         output = model(image)
         #torch.set_deterministic(False)
         loss = criterion(output, target)
