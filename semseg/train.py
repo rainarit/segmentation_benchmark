@@ -120,8 +120,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_image('Images/train_original', grid, train_step, dataformats='CHW')
 
         output = model(image)
-
-        writer.add_graph(model, image)
+        
         #torch.set_deterministic(False)
         loss = criterion(output, target)
         #torch.set_deterministic(True)
