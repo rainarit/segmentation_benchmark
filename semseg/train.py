@@ -112,12 +112,20 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        print(image.shape)
-        print(target.shape)
+
+        # create a color pallette, selecting a color for each class
+        palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+        colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+        colors = (colors % 255).numpy().astype("uint8")
+        # plot the semantic segmentation predictions of 21 classes in each color
+        r = Image.fromarray(target.byte().cpu().numpy()).resize((480,480))
+        r.putpalette(colors)
+        r = np.array(r.convert('RGB'))
+        print(r.shape)
+
         img = np.reshape(image[0], (-1, 480, 480, 3))
-        tgt = np.reshape(target[0], (-1, 480, 480, 1))
         writer.add_image('Images/train_original', img, train_step, dataformats='NHWC')
-        writer.add_image('Images/train_truth', tgt, train_step, dataformats='NHWC')
+        writer.add_image('Images/train_truth', r, train_step, dataformats='NHWC')
         image, target = image.to(device), target.to(device)
         output = model(image)
         #torch.set_deterministic(False)
