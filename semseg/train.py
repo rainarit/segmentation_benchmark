@@ -112,8 +112,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        print(type(image.permute(0, 3, 1, 2).numpy()))
-        writer.add_image('Images/train_original', image.permute(0, 3, 1, 2).numpy(), train_step, dataformats='HWC')
+        writer.add_image('Images/train_original', (image.squeeze()*255).astype(np.uint8), train_step, dataformats='HWC')
         image, target = image.to(device), target.to(device)
         output = model(image)
         #torch.set_deterministic(False)
