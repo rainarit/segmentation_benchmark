@@ -113,9 +113,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
         img = np.reshape(image[0], (-1, 480, 480, 3))
-        tgt = np.reshape(target[0], (-1, 480, 480, 3))
+        #tgt = np.reshape(target[0], (-1, 480, 480, 3))
         writer.add_image('Images/train_original', img, train_step, dataformats='NHWC')
-        writer.add_image('Images/train_truth', tgt, train_step, dataformats='NHWC')
+        writer.add_image('Images/train_truth', get_mask(target), train_step, dataformats='NHWC')
         image, target = image.to(device), target.to(device)
         output = model(image)
         #torch.set_deterministic(False)
