@@ -112,6 +112,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
+        print(image.shape)
+        print(target.shape)
         img = np.reshape(image[0], (-1, 480, 480, 3))
         tgt = np.reshape(target[0], (-1, 480, 480, 1))
         writer.add_image('Images/train_original', img, train_step, dataformats='NHWC')
