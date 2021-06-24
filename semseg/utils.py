@@ -85,9 +85,7 @@ class ConfusionMatrix(object):
         with torch.no_grad():
             k = (a >= 0) & (a < n)
             inds = n * a[k].to(torch.int64) + b[k]
-            torch.set_deterministic(False)
             self.mat += torch.bincount(inds, minlength=n**2).reshape(n, n)
-            torch.set_deterministic(True)
 
     def reset(self):
         self.mat.zero_()
