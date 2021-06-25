@@ -10,6 +10,8 @@ import numpy as np
 import random
 from PIL import Image
 
+from coco_seg import COCOSegmentation
+
 from coco_utils import get_coco
 import presets
 import utils
@@ -18,6 +20,8 @@ import os
 import sys
 
 import torch
+
+from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
@@ -167,8 +171,21 @@ def main(args):
 
     device = torch.device(args.device)
 
-    dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
-    dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+    # image transform
+    input_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+    ])
+    # dataset and dataloader
+    data_kwargs = {'transform': input_transform, 'base_size': 520, 'crop_size': 480}
+
+    dataset = COCOSegmentation(split='train', mode='train', **data_kwargs)
+    dataset_test = COCOSegmentation(split='val', mode='val', **data_kwargs)
+    num_classes = 21
+
+
+    #dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
+    #dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
