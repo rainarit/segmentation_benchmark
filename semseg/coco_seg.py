@@ -160,7 +160,6 @@ class COCOSegmentation(SegmentationDataset):
 
     def __getitem__(self, index):
         coco = self.coco
-        print(index)
         img_id = self.ids[index]
         img_metadata = coco.loadImgs(img_id)[0]
         path = img_metadata['file_name']
