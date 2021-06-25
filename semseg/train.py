@@ -11,6 +11,8 @@ import random
 from PIL import Image
 
 from coco_seg import COCOSegmentation
+from torch.utils.data.sampler import Sampler, BatchSampler
+import torch.utils.data as data
 
 from coco_utils import get_coco
 import presets
@@ -42,6 +44,34 @@ torch.backends.cudnn.deterministic = True
 
 g = torch.Generator()
 g.manual_seed(42)
+
+class IterationBasedBatchSampler(BatchSampler):
+    """
+    Wraps a BatchSampler, resampling from it until
+    a specified number of iterations have been sampled
+    """
+
+    def __init__(self, batch_sampler, num_iterations, start_iter=0):
+        self.batch_sampler = batch_sampler
+        self.num_iterations = num_iterations
+        self.start_iter = start_iter
+
+    def __iter__(self):
+        iteration = self.start_iter
+        while iteration <= self.num_iterations:
+            # if the underlying sampler has a set_epoch method, like
+            # DistributedSampler, used for making each process see
+            # a different split of the dataset, then set it
+            if hasattr(self.batch_sampler.sampler, "set_epoch"):
+                self.batch_sampler.sampler.set_epoch(iteration)
+            for batch in self.batch_sampler:
+                iteration += 1
+                if iteration > self.num_iterations:
+                    break
+                yield batch
+
+    def __len__(self):
+        return self.num_iterations
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -183,6 +213,8 @@ def main(args):
     dataset_test = COCOSegmentation(split='val', mode='val', **data_kwargs)
     num_classes = 21
 
+    args.iters_per_epoch = len(dataset) // (args.num_gpus * args.batch_size)
+    args.max_iters = args.epochs * args.iters_per_epoch
 
     #dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     #dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
@@ -190,14 +222,18 @@ def main(args):
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
+    train_sampler_batch = data.sampler.BatchSampler(train_sampler, args.batch_size, drop_last=True)
+    train_sampler_batch = IterationBasedBatchSampler(train_sampler_batch, args.max_iters, start_iter=0)
+    test_sampler_batch = data.sampler.BatchSampler(test_sampler, args.batch_size, drop_last=True)
+
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=args.workers,
+        sampler=train_sampler_batch, num_workers=args.workers,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
+        sampler=test_sampler_batch, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
@@ -249,6 +285,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='fcn_resnet101', help='model')
+    parser.add_argument('--num-gpus', default=1, type=int)
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=8, type=int)
