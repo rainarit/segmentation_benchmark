@@ -36,8 +36,8 @@ torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
-#g = torch.Generator()
-#g.manual_seed(42)
+g = torch.Generator()
+g.manual_seed(42)
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -130,9 +130,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         
         optimizer.step()
 
-        metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
-
         lr_scheduler.step()
+
+        metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
         writer.add_scalar("Loss/train", loss.item(), train_step)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], train_step)
@@ -162,6 +162,7 @@ def main(args):
         utils.mkdir(args.output_dir)
 
     utils.init_distributed_mode(args)
+
     print(args)
 
     device = torch.device(args.device)
@@ -174,12 +175,12 @@ def main(args):
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        num_workers=args.workers, sampler=train_sampler,
+        sampler=train_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        num_workers=args.workers, sampler=test_sampler,
+        sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
@@ -187,22 +188,22 @@ def main(args):
                                                                  pretrained=args.pretrained)
     model.to(device)
 
+    model_without_ddp = model
+
     params_to_optimize = [
-        {"params": [p for p in model.backbone.parameters() if p.requires_grad]},
-        {"params": [p for p in model.classifier.parameters() if p.requires_grad]},
+        {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
+        {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
     ]
-
     if args.aux_loss:
-        params = [p for p in model.aux_classifier.parameters() if p.requires_grad]
+        params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
+    optimizer = torch.optim.SGD(
+        params_to_optimize,
+        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    optimizer = torch.optim.SGD(params_to_optimize,
-                                lr=args.lr, 
-                                momentum=args.momentum, 
-                                weight_decay=args.weight_decay)
-
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                                                     lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
     if args.test_only:
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
