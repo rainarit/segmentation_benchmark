@@ -233,12 +233,12 @@ def main(args):
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
-        sampler=train_sampler_batch, num_workers=args.workers,
+        sampler=train_batch_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, pin_memory=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler_batch, num_workers=args.workers,
+        sampler=val_batch_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, pin_memory=True)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
