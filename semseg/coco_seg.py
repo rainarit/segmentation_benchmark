@@ -183,6 +183,9 @@ class COCOSegmentation(SegmentationDataset):
     def _mask_transform(self, mask):
         return torch.LongTensor(np.array(mask).astype('int32'))
 
+    def __len__(self):
+        return len(self.ids)
+
     def _gen_seg_mask(self, target, h, w):
         mask = np.zeros((h, w), dtype=np.uint8)
         coco_mask = self.coco_mask
