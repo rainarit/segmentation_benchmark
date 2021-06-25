@@ -147,7 +147,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
     for image, target, _ in metric_logger.log_every(data_loader, print_freq, header):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
-
+        print(9999)
         image, target = image.to(device), target.to(device)
 
         output = model(image)
