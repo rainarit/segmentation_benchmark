@@ -190,6 +190,12 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
+def make_batch_data_sampler(sampler, images_per_batch, num_iters=None, start_iter=0):
+    batch_sampler = data.sampler.BatchSampler(sampler, images_per_batch, drop_last=True)
+    if num_iters is not None:
+        batch_sampler = IterationBasedBatchSampler(batch_sampler, num_iters, start_iter)
+    return batch_sampler
+
 def main(args):
 
     if args.output_dir:
@@ -221,10 +227,9 @@ def main(args):
 
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
+    train_batch_sampler = make_batch_data_sampler(train_sampler, args.batch_size, args.max_iters)
+    val_batch_sampler = make_batch_data_sampler(test_sampler, args.batch_size)
 
-    train_sampler_batch = data.sampler.BatchSampler(train_sampler, args.batch_size, drop_last=True)
-    train_sampler_batch = IterationBasedBatchSampler(train_sampler_batch, args.max_iters, start_iter=0)
-    test_sampler_batch = data.sampler.BatchSampler(test_sampler, args.batch_size, drop_last=True)
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
