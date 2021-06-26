@@ -64,7 +64,7 @@ def criterion(inputs, target):
     if len(losses) == 1:
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
-    
+
 def evaluate(model, data_loader, device, num_classes):
     global val_step
     model.eval()
@@ -173,14 +173,14 @@ def main(args):
     print('Training time {}'.format(total_time_str))
 
 def get_args_parser(add_help=True):
-     import argparse
-     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
+    import argparse
+    parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
-     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco/images', help='dataset path')
-     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco', help='dataset path')
-     parser.add_argument('--dataset', default='coco', help='dataset name')
-     parser.add_argument('--model', default='fcn_resnet101', help='model')
-     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
+    parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco/images', help='dataset path')
+    parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco', help='dataset path')
+    parser.add_argument('--dataset', default='coco', help='dataset name')
+    parser.add_argument('--model', default='fcn_resnet101', help='model')
+    parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=8, type=int)
     parser.add_argument('--epochs', default=30, type=int, metavar='N',
