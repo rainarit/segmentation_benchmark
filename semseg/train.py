@@ -176,7 +176,6 @@ def get_args_parser(add_help=True):
     import argparse
     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
-    parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco/images', help='dataset path')
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/coco', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='fcn_resnet101', help='model')
