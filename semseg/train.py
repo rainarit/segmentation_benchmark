@@ -145,7 +145,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
-    for image, target in data_loader:
+    for image, target in metric_logger.log_every(data_loader, print_freq, header):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
         print(9999)
         image, target = image.to(device), target.to(device)
@@ -227,19 +227,30 @@ def main(args):
 
     train_sampler = torch.utils.data.RandomSampler(dataset)
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
+
+    
     train_batch_sampler = make_batch_data_sampler(train_sampler, args.batch_size, args.max_iters)
     val_batch_sampler = make_batch_data_sampler(test_sampler, args.batch_size)
 
 
-    data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=args.batch_size,
-        sampler=train_batch_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn, pin_memory=True)
+    #data_loader = torch.utils.data.DataLoader(
+    #    dataset, batch_size=args.batch_size,
+    #    sampler=train_batch_sampler, num_workers=args.workers,
+    #    collate_fn=utils.collate_fn, pin_memory=True)
 
-    data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1,
-        sampler=val_batch_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn, pin_memory=True)
+    #data_loader_test = torch.utils.data.DataLoader(
+    #    dataset_test, batch_size=1,
+    #    sampler=val_batch_sampler, num_workers=args.workers,
+    #    collate_fn=utils.collate_fn, pin_memory=True)
+
+    data_loader = data.DataLoader(dataset=dataset,
+                                            batch_sampler=train_batch_sampler,
+                                            num_workers=args.workers,
+                                            pin_memory=True)
+    data_loader_test = data.DataLoader(dataset=dataset_test,
+                                          batch_sampler=val_batch_sampler,
+                                          num_workers=args.workers,
+                                          pin_memory=True)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
