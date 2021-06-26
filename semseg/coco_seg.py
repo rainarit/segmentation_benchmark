@@ -142,12 +142,12 @@ class COCOSegmentation(SegmentationDataset):
             print('train set')
             ann_file = os.path.join(root, 'annotations/instances_train2017.json')
             ids_file = os.path.join(root, 'annotations/train_ids.mx')
-            self.root = os.path.join(root, 'train2017')
+            self.root = os.path.join(root, 'images/train2017')
         else:
             print('val set')
             ann_file = os.path.join(root, 'annotations/instances_val2017.json')
             ids_file = os.path.join(root, 'annotations/val_ids.mx')
-            self.root = os.path.join(root, 'val2017')
+            self.root = os.path.join(root, 'images/val2017')
         self.coco = COCO(ann_file)
         self.coco_mask = mask
         if os.path.exists(ids_file):
