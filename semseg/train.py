@@ -141,9 +141,12 @@ def seed_worker(worker_id):
 def main(args):
     if args.output_dir:
         utils.mkdir(args.output_dir)
+
+    torch.distributed.init_process_group(backend="nccl")
+    
     utils.init_distributed_mode(args)
     print("Using Distributed Mode")
-    
+
     print(args)
 
     device = torch.device(args.device)
