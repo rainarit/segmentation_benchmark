@@ -94,11 +94,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
 
-    intended_batch = 32
-
-    # Number of repetitions for batch spoofing
-    repeat = max(1, int(intended_batch / args.batch_size))
-
     for i, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
         writer.add_image('Images/train_ground_truth', target, train_step, dataformats='NHW')
