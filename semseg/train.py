@@ -109,13 +109,11 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         loss = criterion(output, target)
 
+        optimizer.zero_grad()
         loss.backward()
+        optimizer.step()
 
-        # batch spoofing
-        if not i % repeat:
-            optimizer.step()
-            optimizer.zero_grad()
-            lr_scheduler.step()
+        lr_scheduler.step()
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
