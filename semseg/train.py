@@ -74,8 +74,13 @@ def evaluate(model, data_loader, device, num_classes):
     with torch.no_grad():
         for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
+            writer.add_image('Images/val_original', image, train_step, dataformats='NCHW')
+            writer.add_image('Images/val_ground_truth', target, train_step, dataformats='NCHW')
+
             output = model(image)
+
             writer.add_image('Images/val', get_mask(output), val_step, dataformats='HWC')
+
             output = output['out']
             val_step = val_step + 1
             confmat.update(target.flatten(), output.argmax(1).flatten())
@@ -96,6 +101,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
     for i, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
+        writer.add_image('Images/train_ground_truth', target, train_step, dataformats='NCHW')
+
         image, target = image.to(device), target.to(device)
 
         output = model(image)
