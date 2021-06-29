@@ -142,6 +142,8 @@ def main(args):
     if args.output_dir:
         utils.mkdir(args.output_dir)
     utils.init_distributed_mode(args)
+    print("Using Distributed Mode")
+    
     print(args)
 
     device = torch.device(args.device)
@@ -160,7 +162,7 @@ def main(args):
         dataset, batch_size=args.batch_size,
         sampler=train_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, drop_last=True)
-        
+
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
