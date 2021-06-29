@@ -92,7 +92,10 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     scale = 0 # Given batch_size 16 --> this will be 32 via scaling
     intended_batch = 32
 
-    for image, target in metric_logger.log_every(data_loader, print_freq, header):
+    # Number of repetitions for batch spoofing
+    repeat = max(1, int(32 / args.batch_size))
+
+    for i, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
         image, target = image.to(device), target.to(device)
 
@@ -100,15 +103,13 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         loss = criterion(output, target)
 
-        optimizer.zero_grad()
-
         loss.backward()
-        
-        scale+=args.batch_size
-        if scale == intended_batch:
+
+        # batch spoofing
+        if not i % repeat:
             optimizer.step()
+            optimizer.zero_grad()
             lr_scheduler.step()
-            scale = 0
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
