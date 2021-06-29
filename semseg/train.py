@@ -75,7 +75,7 @@ def evaluate(model, data_loader, device, num_classes):
         for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
             writer.add_image('Images/val_original', image, train_step, dataformats='NCHW')
-            writer.add_image('Images/val_ground_truth', target, train_step, dataformats='NCHW')
+            writer.add_image('Images/val_ground_truth', target, train_step, dataformats='NHW')
 
             output = model(image)
 
@@ -101,7 +101,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
     for i, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
-        writer.add_image('Images/train_ground_truth', target, train_step, dataformats='NCHW')
+        writer.add_image('Images/train_ground_truth', target, train_step, dataformats='NHW')
 
         image, target = image.to(device), target.to(device)
 
