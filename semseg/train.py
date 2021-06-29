@@ -160,6 +160,7 @@ def main(args):
         dataset, batch_size=args.batch_size,
         sampler=train_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, drop_last=True)
+        
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
@@ -174,6 +175,7 @@ def main(args):
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model_without_ddp = model
+
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
