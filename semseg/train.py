@@ -123,6 +123,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         
         train_step = train_step + 1
         writer.flush()
+        break
 
     confmat_train.reduce_from_all_processes()
 
