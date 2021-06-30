@@ -205,8 +205,12 @@ def main(args):
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-        writer.add_scalar("Mean IoU/val", confmat.iu, epoch)
-        writer.add_scalar("Pixel Accuracy/val", confmat.acc_global, epoch)
+
+        confmat_iu = confmat.get_IoU()
+        confmat_acc_global = confmat.get_acc_global_correct()
+
+        writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
+        writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
         writer.flush()
     
     total_time = time.time() - start_time
