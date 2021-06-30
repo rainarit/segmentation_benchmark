@@ -106,6 +106,14 @@ class ConfusionMatrix(object):
             return
         torch.distributed.barrier()
         torch.distributed.all_reduce(self.mat)
+    
+    def get_IoU(self):
+        acc_global, acc, iu = self.compute()
+        return iu.mean().item() * 100
+
+    def get_acc_global_correct(self):
+        acc_global, acc, iu = self.compute()
+        return acc_global.item() * 100
 
     def __str__(self):
         acc_global, acc, iu = self.compute()
