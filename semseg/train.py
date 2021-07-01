@@ -18,8 +18,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
 
-
-
 seed=42
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
@@ -31,6 +29,9 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 g = torch.Generator()
 g.manual_seed(42)
+
+evaluate_step = 0
+train_step = 0
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -71,12 +72,15 @@ def criterion(inputs, target):
     return losses['out'] + 0.5 * losses['aux']
 
 def evaluate(model, data_loader, device, num_classes):
+
+    global evaluate_step
+
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for evaluate_step, (image, target) in enumerate(metric_logger.log_every(data_loader, 100, header)):
+        for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
 
             output = model(image)
@@ -88,16 +92,22 @@ def evaluate(model, data_loader, device, num_classes):
 
             writer.flush()
 
+            evaluate_step+=1
+
+            
+
         confmat.reduce_from_all_processes()
     return confmat
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
+    global train_step
+
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
 
-    for train_step, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for image, target in metric_logger.log_every(data_loader, print_freq, header):
         writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
 
         image, target = image.to(device), target.to(device)
@@ -125,6 +135,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
         writer.add_image('Images/train_prediction', get_mask(output), train_step, dataformats='HWC')
         writer.flush()
+
+        train_step += 1
 
     confmat_train.reduce_from_all_processes()
 
