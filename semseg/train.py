@@ -40,7 +40,10 @@ def get_dataset(dir_path, name, image_set, transform):
         "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
     }
     p, ds_fn, num_classes = paths[name]
-    ds = ds_fn(p, image_set=image_set, transforms=transform)
+    if name == "voc":
+        ds = ds_fn(p, image_set=image_set, transforms=transform, download=True)
+    else:
+        ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
 
 def get_mask(output):
