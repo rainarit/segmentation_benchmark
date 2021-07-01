@@ -225,6 +225,20 @@ def main(args):
         writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
         writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
         writer.flush()
+
+        checkpoint = {
+            'model': model_without_ddp.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'lr_scheduler': lr_scheduler.state_dict(),
+            'epoch': epoch,
+            'args': args
+        }
+        utils.save_on_master(
+            checkpoint,
+            os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
+        utils.save_on_master(
+            checkpoint,
+            os.path.join(args.output_dir, 'checkpoint.pth'))
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
