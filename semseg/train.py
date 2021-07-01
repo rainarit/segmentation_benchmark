@@ -17,8 +17,6 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
-train_step = 0
-val_step = 0
 
 
 
@@ -78,19 +76,15 @@ def evaluate(model, data_loader, device, num_classes):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for i, (image, target) in enumerate(metric_logger.log_every(data_loader, 100, header)):
+        for evaluate_step, (image, target) in enumerate(metric_logger.log_every(data_loader, 100, header)):
             image, target = image.to(device), target.to(device)
 
             output = model(image)
 
-            writer.add_image('Images/val', get_mask(output), i, dataformats='HWC')
+            writer.add_image('Images/val', get_mask(output), evaluate_step, dataformats='HWC')
 
             output = output['out']
             confmat.update(target.flatten(), output.argmax(1).flatten())
-            confmat_eval_acc_global, confmat_eval_acc, confmat_eval_iu = confmat.compute()
-
-            writer.add_scalar("Mean IoU/during_val", confmat_eval_iu.mean().item() * 100, i)
-            writer.add_scalar("Pixel Accuracy/during_val", confmat_eval_acc_global.item() * 100, i)
 
         confmat.reduce_from_all_processes()
     return confmat
@@ -101,8 +95,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
 
-    for i, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        writer.add_image('Images/train_original', image, i, dataformats='NCHW')
+    for train_step, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
 
         image, target = image.to(device), target.to(device)
 
@@ -118,16 +112,16 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        writer.add_scalar("Loss/train", loss.item(), i)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], i)
+        writer.add_scalar("Loss/train", loss.item(), train_step)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, i)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, i)
-        writer.add_image('Images/train_prediction', get_mask(output), i, dataformats='HWC')
+        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
+        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
+        writer.add_image('Images/train_prediction', get_mask(output), train_step, dataformats='HWC')
 
         writer.flush()
 
@@ -141,7 +135,6 @@ def seed_worker(worker_id):
 def main(args):
     if args.output_dir:
         utils.mkdir(args.output_dir)
-
 
     utils.init_distributed_mode(args)
 
