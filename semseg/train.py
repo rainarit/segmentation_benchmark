@@ -82,9 +82,11 @@ def evaluate(model, data_loader, device, num_classes):
             output = model(image)
 
             writer.add_image('Images/val', get_mask(output), evaluate_step, dataformats='HWC')
-
+            
             output = output['out']
             confmat.update(target.flatten(), output.argmax(1).flatten())
+
+            writer.flush()
 
         confmat.reduce_from_all_processes()
     return confmat
@@ -122,7 +124,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
         writer.add_image('Images/train_prediction', get_mask(output), train_step, dataformats='HWC')
-
         writer.flush()
 
     confmat_train.reduce_from_all_processes()
