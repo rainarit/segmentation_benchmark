@@ -73,23 +73,25 @@ def criterion(inputs, target):
     return losses['out'] + 0.5 * losses['aux']
 
 def evaluate(model, data_loader, device, num_classes):
-    global val_step
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for image, target in metric_logger.log_every(data_loader, 100, header):
+        for i, (image, target) in enumerate(metric_logger.log_every(data_loader, 100, header)):
             image, target = image.to(device), target.to(device)
-            writer.add_image('Images/val_original', image, train_step, dataformats='NCHW')
 
             output = model(image)
 
-            writer.add_image('Images/val', get_mask(output), val_step, dataformats='HWC')
+            writer.add_image('Images/val', get_mask(output), i, dataformats='HWC')
 
             output = output['out']
-            val_step = val_step + 1
             confmat.update(target.flatten(), output.argmax(1).flatten())
+            confmat_eval_acc_global, confmat_eval_acc, confmat_eval_iu = confmat.compute()
+
+            writer.add_scalar("Mean IoU/during_val", confmat_eval_iu.mean().item() * 100, i)
+            writer.add_scalar("Pixel Accuracy/during_val", confmat_eval_acc_global.item() * 100, i)
+
         confmat.reduce_from_all_processes()
     return confmat
 
