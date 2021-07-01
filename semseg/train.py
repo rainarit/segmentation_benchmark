@@ -15,6 +15,7 @@ import os
 import sys
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
 writer = SummaryWriter()
 train_step = 0
 val_step = 0
@@ -35,7 +36,8 @@ def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
     paths = {
-        "coco": (dir_path, get_coco, 21)
+        "coco": (dir_path, get_coco, 21), 
+        "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
     }
     p, ds_fn, num_classes = paths[name]
     ds = ds_fn(p, image_set=image_set, transforms=transform)
