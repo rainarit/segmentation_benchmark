@@ -60,7 +60,8 @@ def get_mask(output):
 
 def get_transform(train):
     base_size = 520
-    crop_size = 480
+    # crop_size = 480 --> used during COCO training
+    crop_size = 513
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def criterion(inputs, target):
