@@ -7,6 +7,10 @@ import torch.distributed as dist
 import errno
 import os
 
+import numpy as np
+import pydensecrf.densecrf as dcrf
+import pydensecrf.utils as utils
+
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
@@ -217,7 +221,7 @@ class MetricLogger(object):
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('{} Total time: {}'.format(header, total_time_str))
-
+=
 
 def cat_list(images, fill_value=0):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
@@ -311,3 +315,7 @@ def init_distributed_mode(args):
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)
     setup_for_distributed(args.rank == 0)
+
+
+
+
