@@ -177,3 +177,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
 
     return parser
+
+if __name__ == "__main__":
+    args = get_args_parser().parse_args()
+    main(args)
