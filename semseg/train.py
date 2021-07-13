@@ -29,6 +29,21 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 g = torch.Generator()
 g.manual_seed(42)
+
+evaluate_step = 0
+train_step = 0
+
+class Iterator():
+    """Class container for processing stuff."""
+
+    train_step = 0
+    eval_step = 0
+
+    def add_train(self):
+        self.train_step+=1
+
+    def add_eval(self):
+        self.eval_step+=1
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -68,9 +83,7 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes):
-
-    global evaluate_step
+def evaluate(model, data_loader, device, num_classes, iterator):
 
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
@@ -82,22 +95,20 @@ def evaluate(model, data_loader, device, num_classes):
 
             output = model(image)
 
-            writer.add_image('Images/val', get_mask(output), evaluate_step, dataformats='HWC')
+            writer.add_image('Images/val', get_mask(output), iterator.eval_step, dataformats='HWC')
             
             output = output['out']
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
             writer.flush()
 
-            evaluate_step+=1
+            iterator.add_eval()
 
-            
 
         confmat.reduce_from_all_processes()
     return confmat
 
-def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
-    global train_step
+def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, iterator):
 
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -105,7 +116,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
 
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        writer.add_image('Images/train_original', image, train_step, dataformats='NCHW')
+        writer.add_image('Images/train_original', image, iterator.train_step, dataformats='NCHW')
 
         image, target = image.to(device), target.to(device)
 
@@ -121,19 +132,20 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        writer.add_scalar("Loss/train", loss.item(), train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], train_step)
+        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, train_step)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, train_step)
-        writer.add_image('Images/train_prediction', get_mask(output), train_step, dataformats='HWC')
+        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
+        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
+        writer.add_image('Images/train_prediction', get_mask(output), iterator.train_step, dataformats='HWC')
         writer.flush()
 
-        train_step += 1
+        iterator.add_train()
+
 
     confmat_train.reduce_from_all_processes()
 
@@ -143,16 +155,14 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 def main(args):
-
-    evaluate_step = 0
-    train_step = 0
-    
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
     utils.init_distributed_mode(args)
 
     print(args)
+
+    iterator = Iterator()
 
     device = torch.device(args.device)
 
@@ -215,10 +225,12 @@ def main(args):
     
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
+
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
+
+        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator)
         print(confmat)
 
         confmat_iu = confmat.get_IoU()
