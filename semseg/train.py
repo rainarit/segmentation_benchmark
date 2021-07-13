@@ -32,18 +32,6 @@ g.manual_seed(42)
 
 evaluate_step = 0
 train_step = 0
-
-class Iterator():
-    """Class container for processing stuff."""
-
-    train_step = 0
-    eval_step = 0
-
-    def add_train(self):
-        self.train_step+=1
-
-    def add_eval(self):
-        self.eval_step+=1
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -90,7 +78,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for image, target in metric_logger.log_every(data_loader, 100, header):
+        for image, target in metric_logger.log_every(data_loader, 10, header):
             image, target = image.to(device), target.to(device)
 
             output = model(image)
@@ -162,7 +150,7 @@ def main(args):
 
     print(args)
 
-    iterator = Iterator()
+    iterator = utils.Iterator()
 
     device = torch.device(args.device)
 
