@@ -176,7 +176,9 @@ def main(args):
         collate_fn=utils.collate_fn)
 
 
-    model = torch.hub.load('github', 'deeplabv3_resnet101', pretrained=False)
+    model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
+                                                                 aux_loss=args.aux_loss,
+                                                                 pretrained=args.pretrained)
 
     model.to(device)
 
