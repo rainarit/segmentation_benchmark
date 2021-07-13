@@ -219,7 +219,7 @@ def main(args):
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
     
     if args.test_only:
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
         return
     
@@ -230,7 +230,7 @@ def main(args):
             train_sampler.set_epoch(epoch)
 
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
 
         confmat_iu = confmat.get_IoU()
