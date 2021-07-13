@@ -73,27 +73,16 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes):
+def evaluate(model, data_loader, device, num_classes, logit_dir):
 
     global evaluate_step
 
     model.eval()
 
-    # Path to save logits
-    logit_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        str(args.model).lower(),
-        "val",
-        "logit",
-    )
-    utils.mkdir(logit_dir)
-    print("Logit dst:", logit_dir)
-
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
+
     with torch.no_grad():
         for image_ids, image, target in tqdm(metric_logger.log_every(data_loader, 100, header)):
             image, target = image.to(device), target.to(device)
@@ -230,6 +219,29 @@ def main(args):
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
         return
+
+    # Path to save logits
+    logit_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        str(args.model).lower(),
+        "val",
+        "logit",
+    )
+    utils.mkdir(logit_dir)
+    print("Logit dst:", logit_dir)
+
+    # Path to save scores
+    save_dir = os.path.join(
+        args.output_dir,
+        "scores",
+        "voc12",
+        str(args.model).lower(),
+        "val",
+    )
+    utils.mkdir(save_dir)
+    print("Score dst:", save_dir)
     
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
@@ -285,7 +297,7 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output-dir', default='.', help='path where to save')
+    parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/semseg/output_dir', help='path where to save')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
