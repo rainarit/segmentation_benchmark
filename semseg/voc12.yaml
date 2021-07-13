@@ -1,7 +1,0 @@
-CRF:
-    ITER_MAX: 10
-    POS_W: 3
-    POS_XY_STD: 1
-    BI_W: 4
-    BI_XY_STD: 67
-    BI_RGB_STD: 3

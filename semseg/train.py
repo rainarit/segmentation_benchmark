@@ -29,9 +29,6 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 g = torch.Generator()
 g.manual_seed(42)
-
-evaluate_step = 0
-train_step = 0
     
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -146,6 +143,10 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 def main(args):
+
+    evaluate_step = 0
+    train_step = 0
+    
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
