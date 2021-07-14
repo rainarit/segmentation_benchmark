@@ -77,9 +77,7 @@ def main(args):
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
-
-    state_dict = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth")
-    model.load_state_dict(state_dict)
+    model = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth")
     model.to(device)
 
     if args.distributed:
