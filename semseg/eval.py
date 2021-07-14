@@ -146,7 +146,7 @@ def main(args):
             logits = logits['out']
 
             # Save on disk for CRF post-processing
-            filename = os.path.join(logit_dir, image_id + ".npy")
+            filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
             np.save(filename, logits.cpu().numpy())
 
             confmat.update(target.flatten(), logits.argmax(1).flatten())
