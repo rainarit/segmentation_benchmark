@@ -14,9 +14,6 @@ import utils
 import os
 import sys
 import torch
-from torch.utils.tensorboard import SummaryWriter
-
-writer = SummaryWriter()
 
 seed=42
 random.seed(seed)
@@ -46,30 +43,6 @@ def get_dataset(dir_path, name, image_set, transform):
     else:
         ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
-
-def evaluate(model, data_loader, device, num_classes, iterator):
-    model.eval()
-    confmat = utils.ConfusionMatrix(num_classes)
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Test:'
-    with torch.no_grad():
-        for image, target in metric_logger.log_every(data_loader, 10, header):
-            image, target = image.to(device), target.to(device)
-
-            output = model(image)
-
-            writer.add_image('Images/val', get_mask(output), iterator.eval_step, dataformats='HWC')
-            
-            output = output['out']
-            confmat.update(target.flatten(), output.argmax(1).flatten())
-
-            writer.flush()
-
-            iterator.add_eval()
-
-
-        confmat.reduce_from_all_processes()
-    return confmat
 
 def main(args):
     if args.output_dir:
