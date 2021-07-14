@@ -132,8 +132,6 @@ def main(args):
     utils.mkdir(save_dir)
     save_path = os.path.join(save_dir, "scores.json")
     print("Score dst:", save_path)
-
-    model.eval()
     
     start_time = time.time()
 
@@ -142,7 +140,7 @@ def main(args):
     header = 'Test:'
 
     with torch.no_grad():
-        for image_ids, image, target in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
+        for image_ids, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
             image, target = image.to(device), target.to(device)
 
             logits = model(image)
