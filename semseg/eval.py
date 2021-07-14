@@ -78,6 +78,10 @@ def main(args):
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
 
+    state_dict = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth")
+    model.load_state_dict(state_dict)
+    model.to(device)
+
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
@@ -104,11 +108,6 @@ def main(args):
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
-    state_dict = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth")
-    model.load_state_dict(state_dict)
-    model.eval()
-    model.to(device)
-
     # Path to save logits
     logit_dir = os.path.join(
         args.output_dir,
@@ -132,6 +131,8 @@ def main(args):
     utils.mkdir(save_dir)
     save_path = os.path.join(save_dir, "scores.json")
     print("Score dst:", save_path)
+
+    model.eval()
     
     start_time = time.time()
 
