@@ -105,8 +105,8 @@ def main(args):
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
-    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth")
-    model.load_state_dict(checkpoint['model'])
+    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth", map_location='cpu')
+    model_without_ddp.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
