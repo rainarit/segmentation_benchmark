@@ -100,15 +100,10 @@ def main(args):
     optimizer = torch.optim.SGD(
         params_to_optimize,
         lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
 
     checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth", map_location='cpu')
     model_without_ddp.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
-    lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
     model.eval()
 
@@ -145,7 +140,7 @@ def main(args):
     header = 'Test:'
 
     with torch.no_grad():
-        for image_ids, image, target in tqdm(metric_logger.log_every(data_loader, 10, header)):
+        for image_ids, image, target in tqdm(metric_logger.log_every(data_loader_test, 10, header)):
             image, target = image.to(device), target.to(device)
 
             logits = model(image)
