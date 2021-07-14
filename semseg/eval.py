@@ -54,13 +54,6 @@ def get_transform(train):
 
 def main(args):
 
-    if args.output_dir:
-        utils.mkdir(args.output_dir)
-
-    utils.init_distributed_mode(args)
-
-    print(args)
-
     # Path to save logits
     logit_dir = os.path.join(
         args.output_dir,
@@ -84,6 +77,15 @@ def main(args):
     utils.mkdir(save_dir)
     save_path = os.path.join(save_dir, "scores.json")
     print("Score dst:", save_path)
+
+    if args.output_dir:
+        utils.mkdir(args.output_dir)
+
+    utils.init_distributed_mode(args)
+
+    print(args)
+
+    iterator = utils.Iterator()
 
     device = torch.device(args.device)
 
