@@ -53,6 +53,38 @@ def get_transform(train):
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def main(args):
+
+    # Path to save logits
+    logit_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "logit",
+    )
+    utils.mkdir(logit_dir)
+    print("Logit dst:", logit_dir)
+
+    # Path to save scores
+    save_dir = os.path.join(
+        args.output_dir,
+        "scores",
+        "voc12",
+        args.model.lower(),
+        "val",
+    )
+    utils.mkdir(save_dir)
+    save_path = os.path.join(save_dir, "scores.json")
+    print("Score dst:", save_path)
+
+    confmat = utils.ConfusionMatrix(num_classes)
+
+    with open(save_path, "w") as f:
+        json.dump(confmat.__str__(), f, indent=4, sort_keys=True)
+
+
+
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
@@ -109,30 +141,6 @@ def main(args):
     optimizer.load_state_dict(checkpoint['optimizer'])
 
     model.eval()
-
-    # Path to save logits
-    logit_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        args.model.lower(),
-        "val",
-        "logit",
-    )
-    utils.mkdir(logit_dir)
-    print("Logit dst:", logit_dir)
-
-    # Path to save scores
-    save_dir = os.path.join(
-        args.output_dir,
-        "scores",
-        "voc12",
-        args.model.lower(),
-        "val",
-    )
-    utils.mkdir(save_dir)
-    save_path = os.path.join(save_dir, "scores.json")
-    print("Score dst:", save_path)
     
     start_time = time.time()
 
