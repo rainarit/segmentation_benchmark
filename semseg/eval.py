@@ -77,7 +77,6 @@ def main(args):
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
-    model.load_state_dict(torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth"))
     model.to(torch.device('cuda'))
 
     if args.distributed:
@@ -105,6 +104,13 @@ def main(args):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
+
+    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth")
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+
+    model.eval()
 
     # Path to save logits
     logit_dir = os.path.join(
