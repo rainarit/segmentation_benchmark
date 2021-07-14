@@ -54,6 +54,13 @@ def get_transform(train):
 
 def main(args):
 
+    if args.output_dir:
+        utils.mkdir(args.output_dir)
+
+    utils.init_distributed_mode(args)
+
+    print(args)
+
     # Path to save logits
     logit_dir = os.path.join(
         args.output_dir,
@@ -77,22 +84,6 @@ def main(args):
     utils.mkdir(save_dir)
     save_path = os.path.join(save_dir, "scores.json")
     print("Score dst:", save_path)
-
-    confmat = utils.ConfusionMatrix(21)
-
-    with open(save_path, "w") as f:
-        json.dump(confmat.__str__(), f, indent=4, sort_keys=True)
-
-
-
-    if args.output_dir:
-        utils.mkdir(args.output_dir)
-
-    utils.init_distributed_mode(args)
-
-    print(args)
-
-    iterator = utils.Iterator()
 
     device = torch.device(args.device)
 
@@ -163,7 +154,7 @@ def main(args):
         confmat.reduce_from_all_processes()
 
     with open(save_path, "w") as f:
-        json.dump(confmat, f, indent=4, sort_keys=True)
+        print(confmat, file=f)
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
