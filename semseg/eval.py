@@ -78,7 +78,7 @@ def main(args):
     save_path = os.path.join(save_dir, "scores.json")
     print("Score dst:", save_path)
 
-    confmat = utils.ConfusionMatrix(num_classes)
+    confmat = utils.ConfusionMatrix(21)
 
     with open(save_path, "w") as f:
         json.dump(confmat.__str__(), f, indent=4, sort_keys=True)
