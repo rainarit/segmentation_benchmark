@@ -15,6 +15,8 @@ import os
 import sys
 import torch
 
+from tqdm import tqdm
+
 seed=42
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
