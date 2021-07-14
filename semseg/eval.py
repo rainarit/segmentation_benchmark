@@ -140,16 +140,15 @@ def main(args):
     header = 'Test:'
 
     with torch.no_grad():
-        for image_ids, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
+        for image_id, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
             image, target = image.to(device), target.to(device)
             print(image_ids)
             logits = model(image)
-            #logits = logits['out']
+            logits = logits['out']
 
             # Save on disk for CRF post-processing
-            for image_id, logit in zip(image_ids, logits):
-                filename = os.path.join(logit_dir, image_id + ".npy")
-                np.save(filename, logit.cpu().numpy())
+            filename = os.path.join(logit_dir, image_id + ".npy")
+            np.save(filename, logits.cpu().numpy())
 
             confmat.update(target.flatten(), logits.argmax(1).flatten())
 
