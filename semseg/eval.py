@@ -14,6 +14,7 @@ import utils
 import os
 import sys
 import torch
+import json
 
 from tqdm import tqdm
 
@@ -182,7 +183,7 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/output', help='path where to save')
+    parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/semseg/output', help='path where to save')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
