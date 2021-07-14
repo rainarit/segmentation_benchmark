@@ -78,7 +78,7 @@ def main(args):
                                                                  aux_loss=args.aux_loss,
                                                                  pretrained=args.pretrained)
     model.load_state_dict(torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth"))
-    model.to(device)
+    model.to(torch.device('cuda'))
 
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
