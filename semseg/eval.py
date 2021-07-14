@@ -142,9 +142,9 @@ def main(args):
     with torch.no_grad():
         for image_ids, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
             image, target = image.to(device), target.to(device)
-
+            print(image_ids)
             logits = model(image)
-            logits = logits['out']
+            #logits = logits['out']
 
             # Save on disk for CRF post-processing
             for image_id, logit in zip(image_ids, logits):
