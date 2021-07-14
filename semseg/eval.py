@@ -44,6 +44,11 @@ def get_dataset(dir_path, name, image_set, transform):
         ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
 
+def get_transform(train):
+    base_size = 520
+    crop_size = 480
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
+
 def main(args):
     if args.output_dir:
         utils.mkdir(args.output_dir)
