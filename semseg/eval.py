@@ -157,11 +157,11 @@ def main(args):
             image, target = image.to(device), target.to(device)
             logits = model(image)
 
-            logits = get_mask(logits)
-
             # Save on disk for CRF post-processing
             filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
-            np.save(filename, logits)
+            np.save(filename, get_mask(logits))
+
+            logits = logits['out']
 
             confmat.update(target.flatten(), logits.argmax(1).flatten())
 
