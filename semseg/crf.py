@@ -92,13 +92,6 @@ def main(args):
 
     device = torch.device(args.device)
 
-    dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
-
-    if args.distributed:
-        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
-    else:
-        test_sampler = torch.utils.data.SequentialSampler(dataset_test)
-
     # CRF post-processor
     postprocessor = DenseCRF(
         iter_max=10,
@@ -135,12 +128,14 @@ def main(args):
     save_path = os.path.join(save_dir, "scores_crf.json")
     print("Score dst:", save_path)
 
+    dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+
     confmat = utils.ConfusionMatrix(num_classes)
 
     # Process per sample
     def process(i):
-        image_id, (image, target) = enumerate(dataset_test.__getitem__(i))
-        image, target = image.to(device), target.to(device)
+        image, target = dataset_test.__getitem__(i)
+        #image, target = image.to(device), target.to(device)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)
