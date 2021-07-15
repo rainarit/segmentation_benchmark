@@ -52,6 +52,17 @@ def get_transform(train):
     crop_size = 480
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
+def get_mask(output):
+    output_predictions = output['out'][0].argmax(0)
+    # create a color pallette, selecting a color for each class
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    colors = (colors % 255).numpy().astype("uint8")
+    # plot the semantic segmentation predictions of 21 classes in each color
+    r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
+    r.putpalette(colors)
+    return np.array(r.convert('RGB'))
+
 def main(args):
 
     # Path to save logits
@@ -145,7 +156,8 @@ def main(args):
         for image_id, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
             image, target = image.to(device), target.to(device)
             logits = model(image)
-            logits = logits['out']
+
+            logits = get_mask(logits)
 
             # Save on disk for CRF post-processing
             filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
