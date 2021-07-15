@@ -16,6 +16,9 @@ import sys
 import torch
 import json
 
+import pydensecrf.densecrf as dcrf
+import pydensecrf.utils as utils_crf
+
 from tqdm import tqdm
 
 seed=42
@@ -30,6 +33,53 @@ torch.backends.cudnn.deterministic = True
 g = torch.Generator()
 g.manual_seed(42)
 
+class DenseCRF(object):
+    def __init__(self, iter_max, pos_w, pos_xy_std, bi_w, bi_xy_std, bi_rgb_std):
+        self.iter_max = iter_max
+        self.pos_w = pos_w
+        self.pos_xy_std = pos_xy_std
+        self.bi_w = bi_w
+        self.bi_xy_std = bi_xy_std
+        self.bi_rgb_std = bi_rgb_std
+
+    def __call__(self, image, probmap):
+        C, H, W = probmap.shape
+
+        U = utils_crf.unary_from_softmax(probmap)
+        U = np.ascontiguousarray(U)
+
+        image = np.ascontiguousarray(image)
+
+        d = dcrf.DenseCRF2D(W, H, C)
+        d.setUnaryEnergy(U)
+        d.addPairwiseGaussian(sxy=self.pos_xy_std, compat=self.pos_w)
+        d.addPairwiseBilateral(
+            sxy=self.bi_xy_std, srgb=self.bi_rgb_std, rgbim=image, compat=self.bi_w
+        )
+
+        Q = d.inference(self.iter_max)
+        Q = np.array(Q).reshape((C, H, W))
+
+        return Q
+
+def get_dataset(dir_path, name, image_set, transform):
+    def sbd(*args, **kwargs):
+        return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
+    paths = {
+        "coco": (dir_path, get_coco, 21), 
+        "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
+    }
+    p, ds_fn, num_classes = paths[name]
+    if name == "voc":
+        ds = ds_fn(p, image_set=image_set, transforms=transform, download=True)
+    else:
+        ds = ds_fn(p, image_set=image_set, transforms=transform)
+    return ds, num_classes
+
+def get_transform(train):
+    base_size = 520
+    crop_size = 480
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def main(args):
 
@@ -40,30 +90,6 @@ def main(args):
 
     print(args)
 
-    # Path to save logits
-    logit_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        args.model.lower(),
-        "val",
-        "logit",
-    )
-    utils.mkdir(logit_dir)
-    print("Logit dst:", logit_dir)
-
-    # Path to save scores
-    save_dir = os.path.join(
-        args.output_dir,
-        "scores",
-        "voc12",
-        args.model.lower(),
-        "val",
-    )
-    utils.mkdir(save_dir)
-    save_path = os.path.join(save_dir, "scores.json")
-    print("Score dst:", save_path)
-
     device = torch.device(args.device)
 
     dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
@@ -73,71 +99,64 @@ def main(args):
     else:
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn)
+    # CRF post-processor
+    postprocessor = DenseCRF(
+        iter_max=10,
+        pos_xy_std=1,
+        pos_w=3,
+        bi_xy_std=67,
+        bi_rgb_std=3,
+        bi_w=4,
+    )
 
+    # Path to logits
+    logit_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "logit",
+    )
+    print("Logit src:", logit_dir)
+    if not os.path.isdir(logit_dir):
+        print("Logit not found, run first: python main.py test [OPTIONS]")
+        quit()
 
-    model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-                                                                 aux_loss=args.aux_loss,
-                                                                 pretrained=args.pretrained)
-    model.to(torch.device('cuda'))
+    # Path to save scores
+    save_dir = os.path.join(
+        args.output_dir,
+        "scores",
+        "voc12",
+        args.model.lower(),
+        "val",
+    )
 
-    if args.distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-
-    model_without_ddp = model
-
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-        model_without_ddp = model.module
-
-    params_to_optimize = [
-        {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
-        {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
-    ]
-
-    if args.aux_loss:
-        params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
-        params_to_optimize.append({"params": params, "lr": args.lr * 10})
-    
-    optimizer = torch.optim.SGD(
-        params_to_optimize,
-        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
-    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth", map_location='cpu')
-    model_without_ddp.load_state_dict(checkpoint['model'])
-    optimizer.load_state_dict(checkpoint['optimizer'])
-
-    model.eval()
-    
-    start_time = time.time()
+    save_path = os.path.join(save_dir, "scores_crf.json")
+    print("Score dst:", save_path)
 
     confmat = utils.ConfusionMatrix(num_classes)
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Test:'
 
-    with torch.no_grad():
-        for image_id, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
-            image, target = image.to(device), target.to(device)
-            logits = model(image)
-            logits = logits['out']
+    # Process per sample
+    def process(i):
+        image_id, (image, target) = enumerate(dataset_test.__getitem__(i))
+        image, target = image.to(device), target.to(device)
 
-            # Save on disk for CRF post-processing
-            filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
-            np.save(filename, logits.cpu().numpy())
+        filename = os.path.join(str(logit_dir), str(i) + ".npy")
+        logit = np.load(filename)
 
-            confmat.update(target.flatten(), logits.argmax(1).flatten())
+        prob = postprocessor(image, logit)
 
-        confmat.reduce_from_all_processes()
+        return prob, target
+
+    for i in range(len(dataset_test)):
+        image, target = process(i)
+        confmat.update(target.flatten(), image.argmax(1).flatten())
+    
+    confmat.reduce_from_all_processes()
 
     with open(save_path, "w") as f:
         print(confmat, file=f)
-    
-    total_time = time.time() - start_time
-    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    print('Evaluation time {}'.format(total_time_str))
     
 
 def get_args_parser(add_help=True):
