@@ -135,7 +135,7 @@ def main(args):
     # Process per sample
     def process(i):
         image, target = dataset_test.__getitem__(i)
-        print(image.shape)
+        print(target.shape)
         #image, target = image.to(device), target.to(device)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
