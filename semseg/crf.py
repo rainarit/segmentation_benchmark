@@ -140,7 +140,8 @@ def main(args):
         logit = torch.from_numpy(np.load(filename))
 
         print(logit.shape)
-        
+        print(image.shape)
+
         prob = postprocessor(image, logit)
 
         return prob, target
