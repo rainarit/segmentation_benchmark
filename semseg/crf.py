@@ -138,7 +138,7 @@ def main(args):
         #image, target = image.to(device), target.to(device)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
-        logit = np.load(filename)
+        logit = torch.from_numpy(np.load(filename))
         print(logit.shape)
 
         prob = postprocessor(image, logit)
