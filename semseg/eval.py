@@ -55,7 +55,6 @@ def get_transform(train):
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def get_mask(output):
-    """Plot visualization of segmentation output."""
     output_predictions = output['out'][0].argmax(0)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
@@ -157,13 +156,13 @@ def main(args):
 
     with torch.no_grad():
         for image_id, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
-            ipdb.set_trace()
             image, target = image.to(device), target.to(device)
+            print("Image: ", image.shape, "\nTarget: ", target.shape)
             logits = model(image)
-
+            print("\nLogits: ", logits['out'].shape)
+            import ipdb; ipdb.set_trace()
             # Save on disk for CRF post-processing
             filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
-            # TODO(ritik): save numpy array of predictions directly to disk
             np.save(filename, get_mask(logits))
 
             logits = logits['out']
