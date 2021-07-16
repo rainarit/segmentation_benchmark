@@ -16,6 +16,8 @@ import sys
 import torch
 import json
 
+import ipdb
+
 from tqdm import tqdm
 
 seed=42
@@ -154,6 +156,7 @@ def main(args):
 
     with torch.no_grad():
         for image_id, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
+            ipdb.set_trace()
             image, target = image.to(device), target.to(device)
             logits = model(image)
 
