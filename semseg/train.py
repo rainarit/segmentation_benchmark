@@ -267,7 +267,7 @@ def get_args_parser(add_help=True):
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='.', help='path where to save')
-    parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
+    parser.add_argument('--tensorboard-dir', default='/runs', help='path where to save tensorboard')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -292,7 +292,5 @@ def get_args_parser(add_help=True):
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
-
     writer = SummaryWriter(str(args.tensorboard_dir))
-
     main(args)
