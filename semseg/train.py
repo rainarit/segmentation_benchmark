@@ -16,8 +16,6 @@ import sys
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter()
-
 seed=42
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
@@ -143,6 +141,7 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 def main(args):
+
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
@@ -293,4 +292,7 @@ def get_args_parser(add_help=True):
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
+
+    writer = SummaryWriter(str(args.tensorboard_dir))
+
     main(args)
