@@ -42,7 +42,7 @@ def get_dataset(dir_path, name, image_set, transform):
     }
     p, ds_fn, num_classes = paths[name]
     if name == "voc":
-        ds = ds_fn(p, image_set=image_set, transforms=transform, download=True)
+        ds = ds_fn(p, image_set=image_set, transforms=transform, download=False)
     else:
         ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
