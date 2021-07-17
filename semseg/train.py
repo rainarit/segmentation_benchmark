@@ -81,6 +81,8 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             output = model(image)
 
+            print(target.shape)
+
             writer.add_image('Images/val', get_mask(output), iterator.eval_step, dataformats='HWC')
             
             output = output['out']
@@ -89,6 +91,8 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             writer.flush()
 
             iterator.add_eval()
+
+            break
 
 
         confmat.reduce_from_all_processes()
