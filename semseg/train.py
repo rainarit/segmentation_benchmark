@@ -161,6 +161,8 @@ def main(args):
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
+    print()
+
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
         test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
@@ -177,6 +179,8 @@ def main(args):
         dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
+    
+    print(len(data_loader_test))
 
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
