@@ -78,8 +78,9 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     with torch.no_grad():
         for image, target in metric_logger.log_every(data_loader, 10, header):
             image, target = image.to(device), target.to(device)
-            writer.add_image('Images/val_image', image, iterator.eval_step, dataformats='NCHW')
-            writer.add_image('Images/val_target', target, iterator.eval_step, dataformats='NHW')
+
+            writer.add_image('Images/val_image', image.detach().cpu().numpy(), iterator.eval_step, dataformats='NCHW')
+            writer.add_image('Images/val_target', target.detach().cpu().numpy(), iterator.eval_step, dataformats='NHW')
             print(image.shape)
             print(target.shape)
             output = model(image)
