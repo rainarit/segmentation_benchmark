@@ -107,9 +107,10 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
 
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        writer.add_image('Images/train_original', image, iterator.train_step, dataformats='NCHW')
 
         image, target = image.to(device), target.to(device)
+        print(image.shape)
+        print(target.shape)
 
         output = model(image)
 
@@ -161,14 +162,13 @@ def main(args):
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
-    print()
-
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
         test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
     else:
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
+
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
@@ -179,9 +179,6 @@ def main(args):
         dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
-    
-    print(len(data_loader_test))
-
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
                                                                  aux_loss=args.aux_loss,
