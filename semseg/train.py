@@ -78,13 +78,13 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     with torch.no_grad():
         for image, target in metric_logger.log_every(data_loader, 10, header):
             image, target = image.to(device), target.to(device)
+            writer.add_image('Images/val_image', image, iterator.eval_step, dataformats='NCHW')
+            writer.add_image('Images/val_target', target, iterator.eval_step, dataformats='NHW')
             print(image.shape)
             print(target.shape)
             output = model(image)
 
-            print(target.shape)
-
-            writer.add_image('Images/val', get_mask(output), iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
             
             output = output['out']
             confmat.update(target.flatten(), output.argmax(1).flatten())
