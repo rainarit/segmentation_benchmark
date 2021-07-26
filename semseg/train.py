@@ -81,7 +81,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             I = image/255.0
             print(I)
-            print(image.shape)
+            print(image[0].shape)
             print(target.shape)
             output = model(image)
 
