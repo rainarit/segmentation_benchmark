@@ -160,7 +160,6 @@ def main(args):
             print("Image: ", image.shape, "\nTarget: ", target.shape)
             logits = model(image)
             print("\nLogits: ", logits['out'].shape)
-            import ipdb; ipdb.set_trace()
             # Save on disk for CRF post-processing
             filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
             np.save(filename, get_mask(logits))
