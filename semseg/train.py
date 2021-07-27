@@ -79,24 +79,18 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for image, target in metric_logger.log_every(data_loader, 10, header):
             image, target = image.to(device), target.to(device)
 
-            I = image/255.0
-            print(I)
-            print(image[0].shape)
-            print(target.shape)
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            print(get_mask(target))
+            writer.add_image('Images/val_target', get_mask(target), iterator.eval_step, dataformats='HWC')
+
             output = model(image)
 
             output = output['out']
+
             writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
-
             writer.flush()
-
             iterator.add_eval()
-
-            break
-
 
         confmat.reduce_from_all_processes()
     return confmat
@@ -112,7 +106,12 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         image, target = image.to(device), target.to(device)
 
+        writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
+        writer.add_image('Images/train_target', get_mask(target), iterator.train_step, dataformats='HWC')
+
         output = model(image)
+
+        writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
 
         loss = criterion(output, target)
 
@@ -133,7 +132,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
         writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
-        writer.add_image('Images/train_prediction', get_mask(output), iterator.train_step, dataformats='HWC')
         writer.flush()
 
         iterator.add_train()
