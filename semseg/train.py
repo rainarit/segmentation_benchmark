@@ -56,12 +56,6 @@ def get_mask(output):
     r.putpalette(colors)
     return np.array(r.convert('RGB'))
 
-def get_mask_target(output):
-    output_predictions = output[0].argmax(0)
-    # plot the semantic segmentation predictions of 21 classes in each color
-    r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
-    return np.array(r)
-
 def get_transform(train):
     base_size = 520
     crop_size = 480
@@ -82,13 +76,13 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for image, target in metric_logger.log_every(data_loader, 10, header):
+        for batch_idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 10, header)):
             image, target = image.to(device), target.to(device)
 
-            print(np.array(Image.fromarray(target[0].byte().cpu().numpy())).shape)
+            ground_truth = data_loader.dataset.masks[batch_idx]
 
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', np.resize(np.array(Image.fromarray(target[0].byte().cpu().numpy())), (480, 480)), iterator.eval_step, dataformats='HW')
+            writer.add_image('Images/val_target', ground_truth, iterator.eval_step, dataformats='HWC')
 
             output = model(image)
 
@@ -115,7 +109,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         image, target = image.to(device), target.to(device)
 
         writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/train_target', get_mask_target(target), iterator.train_step, dataformats='HW')
+        writer.add_image('Images/train_target', np.resize(np.array(Image.fromarray(target[0].byte().cpu().numpy())), (480, 480)), iterator.train_step, dataformats='HW')
 
         output = model(image)
 
