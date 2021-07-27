@@ -13,6 +13,7 @@ import presets
 import utils
 import os
 import sys
+from PIL import Image
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
@@ -79,7 +80,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for batch_idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 10, header)):
             image, target = image.to(device), target.to(device)
 
-            ground_truth = data_loader.dataset.masks[batch_idx]
+            ground_truth = Image.open(data_loader.dataset.masks[batch_idx])
 
             print(ground_truth.shape)
 
