@@ -57,14 +57,9 @@ def get_mask(output):
     return np.array(r.convert('RGB'))
 
 def get_mask_target(output):
-    output_predictions = output[0].argmax(1)
-    # create a color pallette, selecting a color for each class
-    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-    colors = (colors % 255).numpy().astype("uint8")
+    output_predictions = output[0].argmax(0)
     # plot the semantic segmentation predictions of 21 classes in each color
     r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
-    r.putpalette(colors)
     return np.array(r.convert('RGB'))
 
 def get_transform(train):
