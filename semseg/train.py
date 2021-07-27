@@ -81,6 +81,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             image, target = image.to(device), target.to(device)
 
             ground_truth = np.array(Image.open(data_loader.dataset.masks[batch_idx]))
+            print(data_loader.dataset.masks[batch_idx])
 
             print(ground_truth.shape)
 
