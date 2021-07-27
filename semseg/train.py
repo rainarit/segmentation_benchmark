@@ -85,7 +85,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for image, target in metric_logger.log_every(data_loader, 10, header):
             image, target = image.to(device), target.to(device)
 
-            print(target)
+            print(target[0])
 
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             writer.add_image('Images/val_target', get_mask_target(target), iterator.eval_step, dataformats='WHC')
