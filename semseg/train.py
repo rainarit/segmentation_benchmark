@@ -88,7 +88,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             print(np.array(Image.fromarray(target[0].byte().cpu().numpy())).shape)
 
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', np.array(Image.fromarray(target[0].byte().cpu().numpy())), iterator.eval_step, dataformats='HW')
+            writer.add_image('Images/val_target', np.array(Image.fromarray(target[0].byte().cpu().numpy())).resize(480,480), iterator.eval_step, dataformats='HW')
 
             output = model(image)
 
