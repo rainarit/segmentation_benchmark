@@ -83,10 +83,8 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             print(I)
             print(image[0].shape)
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            print(target.shape)
+            print(target.argmax(1).shape)
             output = model(image)
-
-            print(output['out'].argmax(1).flatten().size)
 
             writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
             
