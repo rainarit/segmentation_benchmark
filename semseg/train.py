@@ -80,7 +80,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             image, target = image.to(device), target.to(device)
 
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', get_mask(target), iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_target', get_mask(target), iterator.eval_step, dataformats='WHC')
 
             output = model(image)
 
@@ -107,7 +107,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         image, target = image.to(device), target.to(device)
 
         writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/train_target', get_mask(target), iterator.train_step, dataformats='HWC')
+        writer.add_image('Images/train_target', get_mask(target), iterator.train_step, dataformats='WHC')
 
         output = model(image)
 
