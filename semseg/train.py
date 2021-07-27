@@ -56,6 +56,17 @@ def get_mask(output):
     r.putpalette(colors)
     return np.array(r.convert('RGB'))
 
+def get_mask_target(output):
+    output_predictions = output[0].argmax(1)
+    # create a color pallette, selecting a color for each class
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    colors = (colors % 255).numpy().astype("uint8")
+    # plot the semantic segmentation predictions of 21 classes in each color
+    r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
+    r.putpalette(colors)
+    return np.array(r.convert('RGB'))
+
 def get_transform(train):
     base_size = 520
     crop_size = 480
@@ -80,7 +91,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             image, target = image.to(device), target.to(device)
 
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', get_mask(target), iterator.eval_step, dataformats='WHC')
+            writer.add_image('Images/val_target', get_mask_target(target), iterator.eval_step, dataformats='WHC')
 
             output = model(image)
 
@@ -107,7 +118,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         image, target = image.to(device), target.to(device)
 
         writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/train_target', get_mask(target), iterator.train_step, dataformats='WHC')
+        writer.add_image('Images/train_target', get_mask_target(target), iterator.train_step, dataformats='WHC')
 
         output = model(image)
 
