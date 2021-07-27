@@ -85,6 +85,8 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for image, target in metric_logger.log_every(data_loader, 10, header):
             image, target = image.to(device), target.to(device)
 
+            print(target.flatten().shape)
+
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             writer.add_image('Images/val_target', get_mask_target(target), iterator.eval_step, dataformats='WHC')
 
@@ -133,7 +135,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
-        confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
+        confmat_train.update(cccc, output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
         writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
