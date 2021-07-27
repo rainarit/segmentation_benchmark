@@ -46,7 +46,7 @@ def get_dataset(dir_path, name, image_set, transform):
     return ds, num_classes
 
 def get_mask(output):
-    output_predictions = output['out'][0].argmax(0)
+    output_predictions = output[0].argmax(0)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
@@ -84,11 +84,11 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             print(image[0].shape)
             print(target.shape)
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+            print(get_mask(target))
             output = model(image)
 
-            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-            print(output['out'][0].argmax(0).shape)
             output = output['out']
+            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
             writer.flush()
