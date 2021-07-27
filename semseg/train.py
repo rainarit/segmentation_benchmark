@@ -9,6 +9,7 @@ import numpy as np
 import random
 from PIL import Image
 import matplotlib.image as mpimg
+from tqdm import tqdm
 from coco_utils import get_coco
 import presets
 import utils
@@ -78,7 +79,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for batch_idx, (image, target) in enumerate(data_loader):
+        for batch_idx, (image, target) in tqdm(enumerate(data_loader)):
             image, target = image.to(device), target.to(device)
 
             ground_truth = mpimg.imread(data_loader.dataset.masks[batch_idx])
@@ -94,6 +95,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             confmat.update(target.flatten(), output.argmax(1).flatten())
             writer.flush()
             iterator.add_eval()
+            break
 
         confmat.reduce_from_all_processes()
     return confmat
