@@ -82,6 +82,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             I = image/255.0
             print(I)
             print(image[0].shape)
+            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             print(target.shape)
             output = model(image)
 
