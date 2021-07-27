@@ -113,7 +113,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         image, target = image.to(device), target.to(device)
 
         writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/train_target', get_mask_target(target), iterator.train_step, dataformats='WHC')
+        writer.add_image('Images/train_target', get_mask_target(target), iterator.train_step, dataformats='WH')
 
         output = model(image)
 
