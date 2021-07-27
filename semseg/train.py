@@ -8,6 +8,7 @@ import torchvision
 import numpy as np
 import random
 from PIL import Image
+import matplotlib.image as mpimg
 from coco_utils import get_coco
 import presets
 import utils
@@ -80,8 +81,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for batch_idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 10, header)):
             image, target = image.to(device), target.to(device)
 
-            ground_truth = np.array(Image.open(data_loader.dataset.masks[batch_idx]))
-            print(data_loader.dataset.masks[batch_idx])
+            ground_truth = mpimg.imread(data_loader.dataset.masks[batch_idx])
 
             print(ground_truth.shape)
 
