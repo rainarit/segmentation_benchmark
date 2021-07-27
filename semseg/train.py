@@ -81,6 +81,8 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             ground_truth = data_loader.dataset.masks[batch_idx]
 
+            print(ground_truth.shape)
+
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             writer.add_image('Images/val_target', ground_truth, iterator.eval_step, dataformats='HWC')
 
