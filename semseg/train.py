@@ -60,7 +60,7 @@ def get_mask_target(output):
     output_predictions = output[0].argmax(0)
     # plot the semantic segmentation predictions of 21 classes in each color
     r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
-    return np.array(r.convert('RGB'))
+    return np.array(r)
 
 def get_transform(train):
     base_size = 520
