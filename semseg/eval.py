@@ -15,7 +15,7 @@ import os
 import sys
 import torch
 import json
-
+from PIL import Image
 import ipdb
 
 from tqdm import tqdm
@@ -208,8 +208,15 @@ def main(args):
             output = model(image)
             output = output['out']
 
+            # Saving Logits
             filename = os.path.join(logit_dir, str(idx) + ".npy")
             np.save(filename, output.cpu().numpy())
+
+            # Saving Ground Truths
+            ground_truth = torch.from_numpy(mpimg.imread(data_loader_test.dataset.masks[idx]))
+            image = Image.fromarray(ground_truth)
+            filename = os.path.join(ground_truth_dir, str(idx) + ".png")
+            image.save(str(filename), format='PNG')
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
