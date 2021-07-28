@@ -180,9 +180,6 @@ def main(args):
 
     print(args)
 
-
-    print(local_rank)
-
     iterator = utils.Iterator()
 
     device = torch.device(args.device)
