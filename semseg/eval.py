@@ -215,11 +215,9 @@ def main(args):
             np.save(filename, output.cpu().numpy())
 
             # Saving Ground Truths
-            ground_truth = torch.from_numpy(mpimg.imread(data_loader_test.dataset.masks[idx]))
-            print(data_loader_test.dataset.masks[idx])
-            print(ground_truth.permute(2,0,1)[0:3].shape)
+            ground_truth = Image.open(str(data_loader_test.dataset.masks[idx]))
             filename = os.path.join(ground_truth_dir, str(idx) + ".png")
-            save_image(ground_truth, filename)
+            ground_truth.save(str(filename))
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
