@@ -79,12 +79,12 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for batch_idx, (image, target) in tqdm(enumerate(data_loader)):
+        for batch_idx, (image_path, target_path) in enumerate(zip(data_loader.dataset.images, data_loader.dataset.masks)):
+            image, target = torch.from_numpy(mpimg.imread(image_path)), torch.from_numpy(mpimg.imread(target_path))
             image, target = image.to(device), target.to(device)
-
-            ground_truth = mpimg.imread(data_loader.dataset.masks[batch_idx])
-            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', ground_truth, iterator.eval_step, dataformats='HWC')
+            
+            writer.add_image('Images/val_image', image, iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_target', target, iterator.eval_step, dataformats='HWC')
 
             output = model(image)
 
