@@ -237,7 +237,7 @@ def main(args):
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
     
     if args.test_only:
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, rank=local_rank)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
         return
     
