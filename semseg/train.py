@@ -101,8 +101,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
     with torch.no_grad():
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 4, header)):
-            print(torch.cuda.device_count())
-            print(torch.cuda.current_device())
+            print(args.rank)
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output['out']
@@ -184,7 +183,7 @@ def main(args):
     iterator = utils.Iterator()
     rank = args.rank
 
-    device = torch.device(f'cuda:{rank}')
+    device = torch.device(args.device)
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
@@ -204,7 +203,7 @@ def main(args):
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=1,
+        sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
@@ -218,7 +217,7 @@ def main(args):
     model_without_ddp = model
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[rank], output_device=rank)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
     params_to_optimize = [
