@@ -79,12 +79,12 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for image, target in metric_logger.log_every(data_loader, print_freq, header):
+        for image, target in metric_logger.log_every(data_loader, 1, header):
             image, target = image.to(device), target.to(device)
 
             output = model(torch.unsqueeze(image, 0))
             output = output['out']
-            
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
             
             print(image.shape)
