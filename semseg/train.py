@@ -183,6 +183,8 @@ def main(args):
 
     local_rank = args.local_rank
 
+    print(local_rank)
+
     iterator = utils.Iterator()
 
     device = torch.device("{}:{}".format(args.device, local_rank))
