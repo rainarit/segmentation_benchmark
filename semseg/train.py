@@ -94,7 +94,7 @@ def distributed_eval(idx, image, target, model, device, confmat, data_loader, it
     iterator.add_eval()
 
 def evaluate(model, data_loader, device, num_classes, iterator):
-    print(args.rank)
+    print(args.gpu)
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
