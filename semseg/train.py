@@ -125,7 +125,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, iterator):
 
     model.train()
-    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger = utils.MetricLogger(delimiter="  ") 
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
 
@@ -216,7 +216,7 @@ def main(args):
     model_without_ddp = model
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
     params_to_optimize = [
