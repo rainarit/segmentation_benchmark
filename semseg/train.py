@@ -204,7 +204,7 @@ def main(args):
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
+        sampler=test_sampler, num_workers=1,
         collate_fn=utils.collate_fn)
 
     model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
