@@ -17,6 +17,7 @@ import os
 import sys
 from PIL import Image
 import torch
+from joblib import Parallel, delayed
 from torch.utils.tensorboard import SummaryWriter
 
 seed=42
@@ -72,29 +73,46 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, iterator):
+def distributed_eval(idx, image, target, model, confmat, data_loader, iterator):
+    image, target = image.to(device), target.to(device)
+    output = model(image)
+    output = output['out']
+    confmat.update(target.flatten(), output.argmax(1).flatten())
+    ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+    writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
+    writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+    writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+    writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+    
+    writer.flush()
+    iterator.add_eval()
 
+def evaluate(model, data_loader, device, num_classes, iterator):
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
+
     with torch.no_grad():
-        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
-            image, target = image.to(device), target.to(device)
+        if args.distributed == True:
+            Parallel(n_jobs=-1)(delayed(distributed_eval)(idx, image, target, model, confmat, data_loader, iterator) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)))
+        
+        # for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+        #     image, target = image.to(device), target.to(device)
 
-            output = model(image)
-            output = output['out']
+        #     output = model(image)
+        #     output = output['out']
 
-            confmat.update(target.flatten(), output.argmax(1).flatten())
-            print(idx)
-            ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-            writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
-            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+        #     confmat.update(target.flatten(), output.argmax(1).flatten())
 
-            writer.flush()
-            iterator.add_eval()
+        #     ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+        #     writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
+        #     writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+        #     writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+        #     writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+
+        #     writer.flush()
+        #     iterator.add_eval()
 
         confmat.reduce_from_all_processes()
     return confmat
