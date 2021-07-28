@@ -17,6 +17,7 @@ import torch
 import json
 from PIL import Image
 import matplotlib.image as mpimg
+from torchvision.utils import save_image
 import ipdb
 
 from tqdm import tqdm
@@ -215,9 +216,8 @@ def main(args):
 
             # Saving Ground Truths
             ground_truth = torch.from_numpy(mpimg.imread(data_loader_test.dataset.masks[idx]))
-            image = Image.fromarray(ground_truth)
             filename = os.path.join(ground_truth_dir, str(idx) + ".png")
-            image.save(str(filename), format='PNG')
+            save_image(ground_truth, filename)
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
