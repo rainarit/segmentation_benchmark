@@ -87,7 +87,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
             
-            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
             writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
 
