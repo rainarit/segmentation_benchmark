@@ -182,15 +182,16 @@ def main(args):
     print(args)
 
     iterator = utils.Iterator()
+    rank = args.local_rank
 
-    device = torch.device(args.device)
+    device = torch.device(f'cuda:{rank}')
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
     if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
-        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset, rank=rank)
+        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test, rank=rank)
     else:
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
@@ -217,7 +218,7 @@ def main(args):
     model_without_ddp = model
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0, 1, 2, 3])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[rank], output_device=rank)
         model_without_ddp = model.module
 
     params_to_optimize = [
