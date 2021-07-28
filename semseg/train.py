@@ -29,7 +29,7 @@ from torch.utils.tensorboard import SummaryWriter
 seed=42
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
-os.environ['CUDA_VISIBLE_DEVICES']="0, 1, 2, 3"
+#os.environ['CUDA_VISIBLE_DEVICES']="0, 1, 2, 3"
 np.random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
