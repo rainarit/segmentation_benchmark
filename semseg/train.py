@@ -82,7 +82,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for batch_idx, (image_path, target_path) in enumerate(zip(data_loader.dataset.images, data_loader.dataset.masks)):
             image, target = torch.from_numpy(mpimg.imread(image_path)), torch.from_numpy(mpimg.imread(target_path))
             image, target = image.to(device), target.to(device)
-            output = model(image)
+            output = model(torch.unsqueeze(image, 0))
             output = output['out']
             confmat.update(target.flatten(), output.argmax(1).flatten())
             
