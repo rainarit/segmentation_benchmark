@@ -104,7 +104,6 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 4, header)):
             print(torch.cuda.device_count())
             print(torch.cuda.current_device())
-            print(torch.cuda.get_all_devices())
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output['out']
