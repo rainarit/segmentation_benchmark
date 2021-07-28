@@ -103,8 +103,8 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
             ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-            writer.add_image('Images/ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-            writer.add_image('Images/ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
             writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')

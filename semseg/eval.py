@@ -79,6 +79,54 @@ def main(args):
     utils.mkdir(logit_dir)
     print("Logit dst:", logit_dir)
 
+    # Path to save images
+    image_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "image",
+    )
+    utils.mkdir(image_dir)
+    print("Image dst:", image_dir)
+
+    # Path to ground truth images
+    ground_truth_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "ground_truth",
+    )
+    utils.mkdir(ground_truth_dir)
+    print("Ground truth dst:", ground_truth_dir)
+
+    # Path to prediction images
+    prediction_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "prediction",
+    )
+    utils.mkdir(prediction_dir)
+    print("Prediction dst:", prediction_dir)
+
+    # Path to target images
+    target_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "target",
+    )
+    utils.mkdir(target_dir)
+    print("Target dst:", target_dir)
+
     # Path to save scores
     save_dir = os.path.join(
         args.output_dir,
@@ -142,7 +190,7 @@ def main(args):
         params_to_optimize,
         lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/model_28.pth", map_location='cpu')
+    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/output_models/model_28.pth", map_location='cpu')
     model_without_ddp.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
 
@@ -155,18 +203,17 @@ def main(args):
     header = 'Test:'
 
     with torch.no_grad():
-        for image_id, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 10, header)):
+        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 1, header)):
             image, target = image.to(device), target.to(device)
-            print("Image: ", image.shape, "\nTarget: ", target.shape)
-            logits = model(image)
-            print("\nLogits: ", logits['out'].shape)
-            # Save on disk for CRF post-processing
-            filename = os.path.join(str(logit_dir), str(image_id) + ".npy")
-            np.save(filename, get_mask(logits))
+            output = model(image)
 
-            logits = logits['out']
+            for image_id, logit in zip(idx, output):
+                filename = os.path.join(logit_dir, image_id + ".npy")
+                np.save(filename, logit.cpu().numpy())
 
-            confmat.update(target.flatten(), logits.argmax(1).flatten())
+            output = output['out']
+            
+            confmat.update(target.flatten(), output.argmax(1).flatten())
 
         confmat.reduce_from_all_processes()
 
