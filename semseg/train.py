@@ -100,8 +100,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     header = 'Test:'
 
     with torch.no_grad():
-        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 4, header)):
-            print(args.rank)
+        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output['out']
@@ -181,7 +180,6 @@ def main(args):
     print(args)
 
     iterator = utils.Iterator()
-    rank = args.rank
 
     device = torch.device(args.device)
 
