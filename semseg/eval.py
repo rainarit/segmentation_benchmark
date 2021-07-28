@@ -16,6 +16,7 @@ import sys
 import torch
 import json
 from PIL import Image
+import matplotlib.image as mpimg
 import ipdb
 
 from tqdm import tqdm
