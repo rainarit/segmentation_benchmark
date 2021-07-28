@@ -18,10 +18,6 @@ import sys
 from PIL import Image
 import torch
 import torch.distributed as dist
-try:
-     set_start_method('spawn')
-except RuntimeError:
-    pass
 from torch.utils.tensorboard import SummaryWriter
 
 seed=42
