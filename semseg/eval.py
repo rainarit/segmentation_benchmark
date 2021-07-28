@@ -207,7 +207,7 @@ def main(args):
             image, target = image.to(device), target.to(device)
             output = model(image)
 
-            filename = os.path.join(logit_dir, idx + ".npy")
+            filename = os.path.join(logit_dir, str(idx) + ".npy")
             np.save(filename, output.cpu().numpy())
 
             output = output['out']
