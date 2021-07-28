@@ -101,7 +101,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
     with torch.no_grad():
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 4, header)):
-            print(args.gpu_id)
+            print(args.device)
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output['out']
