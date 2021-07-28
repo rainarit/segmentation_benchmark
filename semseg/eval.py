@@ -206,11 +206,11 @@ def main(args):
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 1, header)):
             image, target = image.to(device), target.to(device)
             output = model(image)
+            output = output['out']
 
             filename = os.path.join(logit_dir, str(idx) + ".npy")
             np.save(filename, output.cpu().numpy())
 
-            output = output['out']
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
         confmat.reduce_from_all_processes()
