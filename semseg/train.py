@@ -18,7 +18,11 @@ import sys
 from PIL import Image
 import torch
 from joblib import Parallel, delayed
-import multiprocessing as mp
+from torch.multiprocessing import Pool, Process, set_start_method
+try:
+     set_start_method('spawn')
+except RuntimeError:
+    pass
 from torch.utils.tensorboard import SummaryWriter
 
 seed=42
