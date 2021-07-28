@@ -95,7 +95,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
     with torch.no_grad():
         if args.distributed == True:
-            Parallel(n_jobs=2, prefer="threads")(delayed(distributed_eval)(idx, image, target, model, device, confmat, data_loader, iterator) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)))
+            Parallel(n_jobs=2)(delayed(distributed_eval)(idx, image, target, model, device, confmat, data_loader, iterator) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)))
         
         # for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
         #     image, target = image.to(device), target.to(device)
