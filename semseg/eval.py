@@ -207,12 +207,10 @@ def main(args):
             image, target = image.to(device), target.to(device)
             output = model(image)
 
-            for image_id, logit in zip(idx, output):
-                filename = os.path.join(logit_dir, image_id + ".npy")
-                np.save(filename, logit.cpu().numpy())
+            filename = os.path.join(logit_dir, idx + ".npy")
+            np.save(filename, output.cpu().numpy())
 
             output = output['out']
-            
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
         confmat.reduce_from_all_processes()
