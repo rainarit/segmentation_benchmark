@@ -80,7 +80,11 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     header = 'Test:'
     with torch.no_grad():
         for batch_idx, (image_path, target_path) in enumerate(zip(data_loader.dataset.images, data_loader.dataset.masks)):
+            print(batch_idx)
+
             image, target = torch.from_numpy(mpimg.imread(image_path)), torch.from_numpy(mpimg.imread(target_path))
+            print(image_path)
+            print(target_path)
             image, target = image.to(device), target.to(device)
             
             writer.add_image('Images/val_image', image, iterator.eval_step, dataformats='HWC')
@@ -179,7 +183,7 @@ def main(args):
         collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1, shuffle=False,
+        dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
