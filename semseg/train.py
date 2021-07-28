@@ -93,8 +93,8 @@ def distributed_eval(idx, image, target, model, device, confmat, data_loader, it
     writer.flush()
     iterator.add_eval()
 
-def evaluate(model, data_loader, device, num_classes, iterator):
-    print(args.gpu)
+def evaluate(model, data_loader, device, num_classes, iterator, rank):
+    print(rank)
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -179,11 +179,13 @@ def main(args):
 
     utils.init_distributed_mode(args)
 
+    local_rank = argv.local_rank
+
     print(args)
 
     iterator = utils.Iterator()
 
-    device = torch.device(args.device)
+    device = torch.device("{}:{}".format(args.device, local_rank))
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
@@ -217,7 +219,7 @@ def main(args):
     model_without_ddp = model
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)
         model_without_ddp = model.module
 
     params_to_optimize = [
@@ -238,7 +240,7 @@ def main(args):
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
     
     if args.test_only:
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, rank=local_rank)
         print(confmat)
         return
     
@@ -283,6 +285,7 @@ def get_args_parser(add_help=True):
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
+    parser.add_argument("--local_rank", type=int, help="Local rank. Necessary for using the torch.distributed.launch utility.")
     parser.add_argument('--model', default='fcn_resnet101', help='model')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
