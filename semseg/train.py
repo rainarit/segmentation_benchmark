@@ -17,9 +17,7 @@ import os
 import sys
 from PIL import Image
 import torch
-from joblib import Parallel, delayed
-import torch.multiprocessing as mp
-from torch.multiprocessing import Pool, Process, set_start_method
+import torch.distributed as dist
 try:
      set_start_method('spawn')
 except RuntimeError:
@@ -101,6 +99,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
     with torch.no_grad():
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+            print(dist.get_rank())
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output['out']
