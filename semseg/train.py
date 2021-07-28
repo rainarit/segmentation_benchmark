@@ -94,7 +94,6 @@ def distributed_eval(idx, image, target, model, device, confmat, data_loader, it
     iterator.add_eval()
 
 def evaluate(model, data_loader, device, num_classes, iterator, rank):
-    print(rank)
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -103,6 +102,8 @@ def evaluate(model, data_loader, device, num_classes, iterator, rank):
     with torch.no_grad():
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 4, header)):
             image, target = image.to(device), target.to(device)
+
+            print(rank)
 
             output = model(image)
             output = output['out']
