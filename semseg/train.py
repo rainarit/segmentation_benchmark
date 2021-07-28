@@ -90,6 +90,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             print(image.shape)
             print(target.shape)
             print(output.shape)
+            print(output.argmax(1).shape)
             
             writer.add_image('Images/val_image', image, iterator.eval_step, dataformats='HWC')
             writer.add_image('Images/val_target', target, iterator.eval_step, dataformats='HWC')
