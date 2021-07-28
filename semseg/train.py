@@ -18,6 +18,7 @@ import sys
 from PIL import Image
 import torch
 from joblib import Parallel, delayed
+import torch.multiprocessing as mp
 from torch.multiprocessing import Pool, Process, set_start_method
 try:
      set_start_method('spawn')
@@ -100,7 +101,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
     with torch.no_grad():
         if args.distributed == True:
-            pool = mp.Pool(mp.cpu_count())
+            pool = Pool(mp.cpu_count())
             [pool.apply(distributed_eval, args=(idx, image, target, model, device, confmat, data_loader, iterator)) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header))]
             pool.close()
           #Parallel(n_jobs=1)(delayed(distributed_eval)(idx, image, target, model, device, confmat, data_loader, iterator) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)))
