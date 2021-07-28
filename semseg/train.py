@@ -189,8 +189,8 @@ def main(args):
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
     if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset, rank=rank)
-        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test, rank=rank)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
     else:
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
