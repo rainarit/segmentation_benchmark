@@ -104,9 +104,13 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
 
-    for image, target in metric_logger.log_every(data_loader, print_freq, header):
+    for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
 
         image, target = image.to(device), target.to(device)
+
+        ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+
+        writer.add_image('Images/ground_image', ground_truth, iterator.train_step, dataformats='HWC')
 
         writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
         writer.add_image('Images/train_target', np.resize(np.array(Image.fromarray(target[0].byte().cpu().numpy())), (480, 480)), iterator.train_step, dataformats='HW')
