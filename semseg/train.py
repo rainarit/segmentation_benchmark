@@ -82,14 +82,13 @@ def evaluate(model, data_loader, device, num_classes, iterator):
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
             image, target = image.to(device), target.to(device)
 
-            ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-            writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
-
             output = model(image)
             output = output['out']
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
-            
+            print(idx)
+            ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+            writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
             writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
             writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
             writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
