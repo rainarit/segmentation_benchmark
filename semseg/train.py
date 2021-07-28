@@ -100,28 +100,25 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     header = 'Test:'
 
     with torch.no_grad():
-        if args.distributed == True:
-            pool = Pool(mp.cpu_count())
-            [pool.apply(distributed_eval, args=(idx, image, target, model, device, confmat, data_loader, iterator)) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header))]
-            pool.close()
-          #Parallel(n_jobs=1)(delayed(distributed_eval)(idx, image, target, model, device, confmat, data_loader, iterator) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)))
+        #if args.distributed == True:
+        #  Parallel(n_jobs=1)(delayed(distributed_eval)(idx, image, target, model, device, confmat, data_loader, iterator) for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)))
         
-        # for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
-        #     image, target = image.to(device), target.to(device)
+        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+            image, target = image.to(device), target.to(device)
 
-        #     output = model(image)
-        #     output = output['out']
+            output = model(image)
+            output = output['out']
 
-        #     confmat.update(target.flatten(), output.argmax(1).flatten())
+            confmat.update(target.flatten(), output.argmax(1).flatten())
 
-        #     ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-        #     writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
-        #     writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-        #     writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-        #     writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+            ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+            writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+            writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
 
-        #     writer.flush()
-        #     iterator.add_eval()
+            writer.flush()
+            iterator.add_eval()
 
         confmat.reduce_from_all_processes()
     return confmat
