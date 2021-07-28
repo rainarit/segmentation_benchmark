@@ -283,6 +283,7 @@ def get_args_parser(add_help=True):
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
+    parser.add_argument("--local_rank", type=int)
     parser.add_argument('--model', default='fcn_resnet101', help='model')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
