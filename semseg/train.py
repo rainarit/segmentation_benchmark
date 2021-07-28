@@ -79,7 +79,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     with torch.no_grad():
-        for batch_idx, (image_path, target_path) in enumerate(zip(data_loader_test.dataset.images, data_loader_test.dataset.masks)):
+        for batch_idx, (image_path, target_path) in enumerate(zip(data_loader.dataset.images, data_loader.dataset.masks)):
             image, target = torch.from_numpy(mpimg.imread(image_path)), torch.from_numpy(mpimg.imread(target_path))
             image, target = image.to(device), target.to(device)
             output = model(image)
