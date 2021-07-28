@@ -179,9 +179,9 @@ def main(args):
 
     utils.init_distributed_mode(args)
 
-    local_rank = argv.local_rank
-
     print(args)
+
+    local_rank = args.local_rank
 
     iterator = utils.Iterator()
 
