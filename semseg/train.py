@@ -34,7 +34,7 @@ g.manual_seed(42)
 
 evaluate_step = 0
 train_step = 0
-    
+
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
@@ -95,7 +95,6 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
     with torch.no_grad():
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
-            print(dist.get_rank())
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output['out']
@@ -126,13 +125,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
 
         image, target = image.to(device), target.to(device)
-
-        writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/train_target', np.resize(np.array(Image.fromarray(target[0].byte().cpu().numpy())), (480, 480)), iterator.train_step, dataformats='HW')
-
         output = model(image)
-
-        writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
 
         loss = criterion(output, target)
 
@@ -143,6 +136,15 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         lr_scheduler.step()
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+
+        ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+
+        writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
+        writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
+        writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
+        writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
+        writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
 
         writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
@@ -156,7 +158,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         writer.flush()
 
         iterator.add_train()
-
 
     confmat_train.reduce_from_all_processes()
 
