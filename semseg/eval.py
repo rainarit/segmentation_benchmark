@@ -216,7 +216,7 @@ def main(args):
 
             # Saving Ground Truths
             ground_truth = torch.from_numpy(mpimg.imread(data_loader_test.dataset.masks[idx]))
-            print(ground_truth.permute(2,0,1)[0].shape)
+            print(ground_truth.permute(2,0,1)[0:3].shape)
             filename = os.path.join(ground_truth_dir, str(idx) + ".png")
             save_image(ground_truth, filename)
 
