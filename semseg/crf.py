@@ -170,10 +170,9 @@ def main(args):
     results = joblib.Parallel(n_jobs=4, verbose=10, pre_dispatch="all")(
         [joblib.delayed(process)(i) for i in range(1)]
     )
-
-    print(results[0][0])
     
-    for i, (preds, gts) in enumerate(*results):   
+    for i, result in enumerate(results):   
+        preds, gts = result[0], result[1]
         confmat.update(gts.flatten(), preds.argmax(0).flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
         writer.flush()
