@@ -44,7 +44,7 @@ class DenseCRF(object):
         self.bi_rgb_std = bi_rgb_std
 
     def __call__(self, image, probmap):
-        C, H, W = probmap.transpose_(2,0,1)
+        C, H, W = probmap.shape
 
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
@@ -148,7 +148,8 @@ def main(args):
         image, target = dataset_test.__getitem__(i)
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
-        logit = torch.from_numpy(mpimg.imread(filename))
+        logit = mpimg.imread(filename).transpose(2, 0, 1)
+        logit = torch.from_numpy(logit)
 
         print(logit.shape)
 
