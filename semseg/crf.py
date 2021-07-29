@@ -157,6 +157,7 @@ def main(args):
         print(logit.shape)
 
         _, H, W = image.shape
+        print(image.shape)
         logit = torch.FloatTensor(logit)[None, ...]
         logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
         prob = F.softmax(logit, dim=1).numpy()
