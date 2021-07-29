@@ -23,6 +23,8 @@ import pydensecrf.utils as utils_crf
 from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
+import multiprocessing
+import joblib
 
 seed=42
 random.seed(seed)
@@ -164,11 +166,21 @@ def main(args):
 
         return prob, target
 
-    for i in tqdm(range(len(dataset_test))):
-        image, target = process(i)
-        confmat.update(target.flatten(), image.argmax(0).flatten())
+    # CRF in multi-process
+    results = joblib.Parallel(n_jobs=4, verbose=10, pre_dispatch="all")(
+        [joblib.delayed(process)(i) for i in range(1)]
+    )
+    
+    for i, (preds, gts) in enumerate(zip(*results)):   
+        confmat.update(gts.flatten(), preds.argmax(0).flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
         writer.flush()
+
+    #for i in tqdm(range(len(dataset_test))):
+    #    image, target = process(i)
+    #    confmat.update(target.flatten(), image.argmax(0).flatten())
+    #    writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
+    #    writer.flush()
     
     confmat.reduce_from_all_processes()
 
