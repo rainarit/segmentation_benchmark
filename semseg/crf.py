@@ -171,7 +171,7 @@ def main(args):
         [joblib.delayed(process)(i) for i in range(1)]
     )
 
-    print(results[0])
+    print(results[0][0])
     
     for i, (preds, gts) in enumerate(*results):   
         confmat.update(gts.flatten(), preds.argmax(0).flatten())
