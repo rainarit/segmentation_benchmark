@@ -152,6 +152,8 @@ def main(args):
 
         image = np.uint8(255 * image)
 
+        print(image.shape)
+
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
         logit = mpimg.imread(filename).transpose(2, 0, 1)
         #logit = torch.from_numpy(logit)
