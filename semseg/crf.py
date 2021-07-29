@@ -160,9 +160,7 @@ def main(args):
         #logit = mpimg.imread(filename).transpose(2, 0, 1)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
-        logit = np.load(filename)
-
-        print(logit.shape)
+        logit = np.load(filename)[0]
 
         prob = postprocessor(image, logit)
 
