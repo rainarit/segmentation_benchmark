@@ -57,7 +57,7 @@ def get_transform(train):
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def get_mask(output):
-    output_predictions = output['out'][0].argmax(0)
+    output_predictions = output[0].argmax(0)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
@@ -247,6 +247,12 @@ def main(args):
             target_image = Image.fromarray(np.uint8(target_in * 255) , 'L')
             filename = os.path.join(target_dir, str(idx) + ".png")
             target_image.save(str(filename))
+
+            # Saving Prediction Image
+            prediction_in = get_mask(output).cpu().numpy().transpose(1, 2, 0)
+            prediction_image = Image.fromarray((prediction_in * 255).astype(np.uint8))
+            filename = os.path.join(prediction_dir, str(idx) + ".png")
+            prediction_image.save(str(filename))
 
 
 
