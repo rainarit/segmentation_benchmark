@@ -170,14 +170,12 @@ def main(args):
     #results = joblib.Parallel(n_jobs=-1, verbose=1, pre_dispatch="all")(
     #    [(process)(i) for i in tqdm(range(len(dataset_test)))]
     #)
-
-    from multiprocessing import Pool
     
-    #for i in tqdm(range(len(dataset_test))):   
-    #    preds, gts = process(i)
-    #    confmat.update(gts.flatten(), preds.argmax(0).flatten())
-    #    writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
-    #    writer.flush()
+    for i in tqdm(range(len(dataset_test))):   
+        preds, gts = process(i)
+        confmat.update(gts.flatten(), preds.argmax(0).flatten())
+        writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
+        writer.flush()
     
     confmat.reduce_from_all_processes()
 
@@ -234,12 +232,3 @@ if __name__ == "__main__":
     args = get_args_parser().parse_args()
     writer = SummaryWriter(str(args.tensorboard_dir))
     main(args)
-    
-    def multi_proc(i):
-        preds, gts = process(i)
-        confmat.update(gts.flatten(), preds.argmax(0).flatten())
-        writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
-        writer.flush()
-
-    a_pool = Pool()                        # Create a multiprocessing Pool
-    a_pool.map(multi_proc, range(len(dataset_test)))
