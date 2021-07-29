@@ -158,7 +158,7 @@ def main(args):
 
         return prob, target
 
-    for i in range(len(dataset_test)):
+    for i in tqdm(range(len(dataset_test))):
         image, target = process(i)
         confmat.update(target.flatten(), image.argmax(0).flatten())
     
