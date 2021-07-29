@@ -49,7 +49,7 @@ class DenseCRF(object):
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
 
-        #image = np.ascontiguousarray(image)
+        image = np.ascontiguousarray(image)
 
 
         d = dcrf.DenseCRF2D(W, H, C)
@@ -149,6 +149,8 @@ def main(args):
         image, target = dataset_test.__getitem__(i)
 
         image = image.cpu().numpy()
+
+        image = np.uint8(255 * image)
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
         logit = mpimg.imread(filename).transpose(2, 0, 1)
