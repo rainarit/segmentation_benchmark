@@ -149,7 +149,7 @@ def main(args):
 
         image = image.cpu().numpy()
 
-        image = np.uint8(255 * image).transpose(2, 0, 1)
+        image = np.uint8(255 * image).transpose(0, 1, 2)
 
         #filename = os.path.join(str(prediction_dir), str(i) + ".png")
         #logit = mpimg.imread(filename).transpose(2, 0, 1)
