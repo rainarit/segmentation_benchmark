@@ -242,6 +242,14 @@ def main(args):
             filename = os.path.join(processed_image_dir, str(idx) + ".png")
             processed_image.save(str(filename))
 
+            # Saving Target Image
+            target_in = target[0].cpu().numpy()
+            target_image = Image.fromarray(target_in * 255)
+            filename = os.path.join(target_dir, str(idx) + ".png")
+            target_image.save(str(filename))
+
+            
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
         confmat.reduce_from_all_processes()
