@@ -244,11 +244,11 @@ def main(args):
 
             # Saving Target Image
             target_in = target[0].cpu().numpy()
-            target_image = Image.fromarray(target_in * 255)
+            target_image = Image.fromarray(np.uint8(target_in * 255) , 'L')
             filename = os.path.join(target_dir, str(idx) + ".png")
             target_image.save(str(filename))
 
-            
+
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
