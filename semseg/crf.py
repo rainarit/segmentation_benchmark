@@ -136,9 +136,8 @@ def main(args):
     # Process per sample
     def process(i):
         image_path, target_path = dataset_test.images[i], dataset_test.masks[i]
-        image = torch.from_numpy(mpimg.imread(image_path))
-        target = torch.from_numpy(mpimg.imread(target_path))
-        #image, target = dataset_test.__getitem__(i)
+        image = mpimg.imread(image_path)
+        target = mpimg.imread(target_path)
         print(image.shape)
         print(target.shape)
 
