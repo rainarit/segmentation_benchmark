@@ -149,12 +149,7 @@ def main(args):
 
         image = image.cpu().numpy()
 
-        print(image.shape)
-
         image = np.uint8(255 * image).transpose(1, 2, 0)
-
-        #filename = os.path.join(str(prediction_dir), str(i) + ".png")
-        #logit = mpimg.imread(filename).transpose(2, 0, 1)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
@@ -165,6 +160,8 @@ def main(args):
 
     for i in range(len(dataset_test)):
         image, target = process(i)
+        print(image.shape)
+        print(target.shape)
         confmat.update(target.flatten(), image.argmax(1).flatten())
     
     confmat.reduce_from_all_processes()
