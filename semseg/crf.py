@@ -162,6 +162,8 @@ def main(args):
         image, target = process(i)
         print(image.shape)
         print(target.shape)
+
+        print(image.argmax(1).flatten().shape)
         confmat.update(target.flatten(), image.argmax(1).flatten())
     
     confmat.reduce_from_all_processes()
