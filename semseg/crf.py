@@ -171,7 +171,7 @@ def main(args):
         [(process)(i) for i in tqdm(range(len(dataset_test)))]
     )
     
-    for i, result in tqdm(enumerate(results)):   
+    for i, result in enumerate(results):   
         preds, gts = result[0], result[1]
         confmat.update(gts.flatten(), preds.argmax(0).flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
