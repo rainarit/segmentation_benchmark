@@ -147,7 +147,7 @@ def main(args):
     def process(i):
         image, target = dataset_test.__getitem__(i)
 
-        print(image.shape)
+        image = image.cpu().numpy()
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
         logit = mpimg.imread(filename).transpose(2, 0, 1)
