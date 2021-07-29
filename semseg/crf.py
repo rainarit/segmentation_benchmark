@@ -71,7 +71,7 @@ def get_dataset(dir_path, name, image_set, transform):
     }
     p, ds_fn, num_classes = paths[name]
     if name == "voc":
-        ds = ds_fn(p, image_set=image_set, transforms=transform, download=False)
+        ds = ds_fn(p, year="2012", image_set=image_set, transforms=transform, download=False)
     else:
         ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
@@ -134,15 +134,13 @@ def main(args):
 
     # Process per sample
     def process(i):
-        image, target = dataset_test.__getitem__(i)
+        image, target = dataset_test.images[i], dataset_test.masks[i]
+        #image, target = dataset_test.__getitem__(i)
         print(image.shape)
         print(target.shape)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = torch.from_numpy(np.load(filename))
-
-        print(logit.shape)
-        print(image.shape)
 
         prob = postprocessor(image, logit)
 
