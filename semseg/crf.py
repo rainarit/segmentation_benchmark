@@ -152,7 +152,7 @@ def main(args):
 
         image = np.uint8(255 * image)
 
-        image = image.transpose(2, 1, 0).reshape((480, 480, 3))
+        image = image.transpose(2, 1, 0).resize((480, 480, 3))
         print(image.shape)
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
