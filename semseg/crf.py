@@ -8,6 +8,7 @@ import torchvision
 import numpy as np
 import random
 from PIL import Image
+import torch.nn.functional as F
 import matplotlib.image as mpimg
 from coco_utils import get_coco
 import presets
