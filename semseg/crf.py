@@ -16,7 +16,7 @@ import os
 import sys
 import torch
 import json
-
+from tqdm import tqdm
 import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils_crf
 
