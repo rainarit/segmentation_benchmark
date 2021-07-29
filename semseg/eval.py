@@ -254,8 +254,6 @@ def main(args):
             filename = os.path.join(prediction_dir, str(idx) + ".png")
             prediction_image.save(str(filename))
 
-
-
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
         confmat.reduce_from_all_processes()
