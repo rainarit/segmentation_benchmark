@@ -149,7 +149,7 @@ def main(args):
 
         image = image.cpu().numpy()
 
-        print(image.shaoe)
+        print(image.shape)
 
         image = np.uint8(255 * image)
 
