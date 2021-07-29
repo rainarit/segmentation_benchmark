@@ -164,6 +164,8 @@ def main(args):
 
         prob = postprocessor(image, prob)
 
+        label = np.argmax(prob, axis=0)
+
         return prob, target
 
     ## CRF in multi-process
@@ -173,7 +175,7 @@ def main(args):
     
     for i in tqdm(range(len(dataset_test))):   
         preds, gts = process(i)
-        confmat.update(gts.flatten(), preds.argmax(0).flatten())
+        confmat.update(gts.flatten(), label.flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
         writer.flush()
     
