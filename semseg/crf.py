@@ -49,8 +49,6 @@ class DenseCRF(object):
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
 
-        print(U.shape)
-
         image = np.ascontiguousarray(image)
 
         d = dcrf.DenseCRF2D(W, H, C)
@@ -151,6 +149,8 @@ def main(args):
 
         image = image.cpu().numpy()
 
+        print(image.shaoe)
+
         image = np.uint8(255 * image)
 
         image = image.transpose(2, 1, 0)
@@ -163,6 +163,8 @@ def main(args):
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
+
+        print(logit.shape)
 
         prob = postprocessor(image, logit)
 
