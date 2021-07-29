@@ -161,6 +161,8 @@ def main(args):
     for i in tqdm(range(len(dataset_test))):
         image, target = process(i)
         confmat.update(target.flatten(), image.argmax(0).flatten())
+        confmat_acc_global, confmat_acc, confmat_iu = confmat.compute()
+        print("Mean IoU:{}".format(confmat_iu.mean().item() * 100))
     
     confmat.reduce_from_all_processes()
 
