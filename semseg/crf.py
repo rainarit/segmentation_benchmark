@@ -148,11 +148,15 @@ def main(args):
         image, target = dataset_test.__getitem__(i)
 
         image = image.cpu().numpy()
-
         image = np.uint8(255 * image).transpose(1, 2, 0)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
+
+        _, H, W = image.shape
+        logit = torch.FloatTensor(logit)[None, ...]
+        logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
+        prob = F.softmax(logit, dim=1)[0].numpy()
 
         prob = postprocessor(image, logit)
 
