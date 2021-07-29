@@ -166,7 +166,7 @@ def main(args):
 
         label = np.argmax(prob, axis=0)
 
-        return prob, target
+        return label, target
 
     ## CRF in multi-process
     #results = joblib.Parallel(n_jobs=-1, verbose=1, pre_dispatch="all")(
