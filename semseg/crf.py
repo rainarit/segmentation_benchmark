@@ -154,7 +154,7 @@ def main(args):
 
         image = image.transpose(2, 1, 0)
         image = Image.fromarray(image)
-        image = image.resize(size=(480, 480, 3))
+        image = image.resize(size=(480, 480))
         print(image.shape)
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
