@@ -140,6 +140,7 @@ def main(args):
         #target = mpimg.imread(target_path)
 
         image, target = dataset_test.__getitem__(i)
+        target = torch.unsqueeze(target, 0)
         print(image.shape)
         print(target.shape)
 
