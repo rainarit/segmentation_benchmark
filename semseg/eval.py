@@ -237,7 +237,9 @@ def main(args):
             images.save(str(filename))
 
             # Saving Processed Image
-            processed_image = Image.fromarray((image.cpu().numpy()[0] * 255).astype(np.uint8))
+            print(image[0].cpu().numpy())
+            print(image[0].shape)
+            processed_image = Image.fromarray(image[0].cpu().numpy())
             filename = os.path.join(processed_image_dir, str(idx) + ".png")
             processed_image.save(str(processed_image))
 
