@@ -93,6 +93,18 @@ def main(args):
     utils.mkdir(image_dir)
     print("Image dst:", image_dir)
 
+    # Path to save processed images
+    processed_image_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "processed_image",
+    )
+    utils.mkdir(processed_image_di)
+    print("Processed Image dst:", processed_image_dir)
+
     # Path to ground truth images
     ground_truth_dir = os.path.join(
         args.output_dir,
@@ -218,6 +230,17 @@ def main(args):
             ground_truth = Image.open(str(data_loader_test.dataset.masks[idx]))
             filename = os.path.join(ground_truth_dir, str(idx) + ".png")
             ground_truth.save(str(filename))
+
+            # Saving Images
+            images = Image.open(str(data_loader_test.dataset.images[idx]))
+            filename = os.path.join(image_dir, str(idx) + ".png")
+            images.save(str(filename))
+
+
+            # Saving Processed Image
+            processed_image = Image.fromarray(image[0].cpu().numpy())
+            filename = os.path.join(processed_image_dir, str(idx) + ".png")
+            processed_image.save(str(processed_image))
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
