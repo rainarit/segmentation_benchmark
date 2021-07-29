@@ -160,12 +160,7 @@ def main(args):
 
     for i in range(len(dataset_test)):
         image, target = process(i)
-        print(image.shape)
-        print(target.shape)
-
-        print(image.argmax(0).flatten().shape)
-        print(target.flatten().shape)
-        confmat.update(target.flatten(), image.argmax(1).flatten())
+        confmat.update(target.flatten(), image.argmax(0).flatten())
     
     confmat.reduce_from_all_processes()
 
