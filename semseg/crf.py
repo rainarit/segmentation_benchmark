@@ -173,10 +173,11 @@ def main(args):
     #    [(process)(i) for i in tqdm(range(len(dataset_test)))]
     #)
     
-    for i in tqdm(range(len(dataset_test))):   
+    for i in tqdm(range(len(1))):   
         preds, gts = process(i)
-        confmat.update(gts.flatten(), label.flatten())
+        confmat.update(gts.flatten(), preds.flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
+        print("Mean IoU: {}".format(confmat.get_IoU()))
         writer.flush()
     
     confmat.reduce_from_all_processes()
