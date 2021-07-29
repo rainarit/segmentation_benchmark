@@ -103,6 +103,16 @@ def main(args):
         bi_w=4,
     )
 
+    # Path to prediction images
+    prediction_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "prediction",
+    )
+
     # Path to logits
     logit_dir = os.path.join(
         args.output_dir,
@@ -141,8 +151,8 @@ def main(args):
 
         image, target = dataset_test.__getitem__(i)
 
-        filename = os.path.join(str(logit_dir), str(i) + ".npy")
-        logit = torch.from_numpy(np.load(filename))
+        filename = os.path.join(str(prediction_dir), str(i) + ".png")
+        logit = torch.from_numpy(mpimg.imread(filename))
 
         print(logit.shape)
 
