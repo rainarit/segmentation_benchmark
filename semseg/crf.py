@@ -170,16 +170,21 @@ def main(args):
     #results = joblib.Parallel(n_jobs=-1, verbose=1, pre_dispatch="all")(
     #    [(process)(i) for i in tqdm(range(len(dataset_test)))]
     #)
-    
-    for i in tqdm(range(len(dataset_test))):   
+
+    from multiprocessing import Pool
+
+    def multi_proc(i):
         preds, gts = process(i)
         confmat.update(gts.flatten(), preds.argmax(0).flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
         writer.flush()
 
-    #for i in tqdm(range(len(dataset_test))):
-    #    image, target = process(i)
-    #    confmat.update(target.flatten(), image.argmax(0).flatten())
+    pool = Pool()                         # Create a multiprocessing Pool
+    pool.map(multi_proc, range(len(dataset_test)))  # process data_inputs iterable with pool
+    
+    #for i in tqdm(range(len(dataset_test))):   
+    #    preds, gts = process(i)
+    #    confmat.update(gts.flatten(), preds.argmax(0).flatten())
     #    writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
     #    writer.flush()
     
