@@ -102,7 +102,7 @@ def main(args):
         "val",
         "processed_image",
     )
-    utils.mkdir(processed_image_di)
+    utils.mkdir(processed_image_dir)
     print("Processed Image dst:", processed_image_dir)
 
     # Path to ground truth images
