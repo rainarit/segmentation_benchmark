@@ -20,6 +20,7 @@ import json
 from tqdm import tqdm
 import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils_crf
+from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
 
@@ -166,8 +167,8 @@ def main(args):
     for i in tqdm(range(len(dataset_test))):
         image, target = process(i)
         confmat.update(target.flatten(), image.argmax(0).flatten())
-        confmat_acc_global, confmat_acc, confmat_iu = confmat.compute()
-        print("Mean IoU:{}".format(confmat_iu.mean().item() * 100))
+        writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
+        writer.flush()
     
     confmat.reduce_from_all_processes()
 
