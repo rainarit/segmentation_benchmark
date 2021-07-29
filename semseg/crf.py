@@ -44,7 +44,7 @@ class DenseCRF(object):
         self.bi_rgb_std = bi_rgb_std
 
     def __call__(self, image, probmap):
-        C, H, W = probmap.shape
+        C, H, W = probmap.shape[2], probmap.shape[0], probmap.shape[1]
 
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
