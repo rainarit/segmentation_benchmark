@@ -149,15 +149,13 @@ def main(args):
 
         image = image.cpu().numpy()
 
-        print(image.shape)
+        image = np.uint8(255 * image)
 
         #filename = os.path.join(str(prediction_dir), str(i) + ".png")
         #logit = mpimg.imread(filename).transpose(2, 0, 1)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
-
-        print(logit.shape)
 
         prob = postprocessor(image, logit)
 
