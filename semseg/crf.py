@@ -163,7 +163,7 @@ def main(args):
         print(image.shape)
         print(target.shape)
 
-        print(image.argmax(1).flatten().shape)
+        print(image.argmax(0).flatten().shape)
         print(target.flatten().shape)
         confmat.update(target.flatten(), image.argmax(1).flatten())
     
