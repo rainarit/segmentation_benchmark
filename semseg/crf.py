@@ -44,7 +44,7 @@ class DenseCRF(object):
         self.bi_rgb_std = bi_rgb_std
 
     def __call__(self, image, probmap):
-        C, H, W = probmap.shape[2], probmap.shape[0], probmap.shape[1]
+        C, H, W = probmap.transpose(2,0,1)
 
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
@@ -145,10 +145,6 @@ def main(args):
 
     # Process per sample
     def process(i):
-        #image_path, target_path = dataset_test.images[i], dataset_test.masks[i]
-        #image = mpimg.imread(image_path)
-        #target = mpimg.imread(target_path)
-
         image, target = dataset_test.__getitem__(i)
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
