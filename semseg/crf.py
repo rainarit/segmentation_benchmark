@@ -49,6 +49,8 @@ class DenseCRF(object):
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
 
+        print(U.shape)
+
         image = np.ascontiguousarray(image)
 
         d = dcrf.DenseCRF2D(W, H, C)
