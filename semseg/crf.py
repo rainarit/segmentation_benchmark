@@ -134,7 +134,9 @@ def main(args):
 
     # Process per sample
     def process(i):
-        image, target = dataset_test.images[i], dataset_test.masks[i]
+        image_path, target_path = dataset_test.images[i], dataset_test.masks[i]
+        image = Image.open(str(image_path))
+        target = Image.open(str(target_path))
         #image, target = dataset_test.__getitem__(i)
         print(image.shape)
         print(target.shape)

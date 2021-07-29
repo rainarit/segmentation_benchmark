@@ -15,7 +15,6 @@ import presets
 import utils
 import os
 import sys
-from PIL import Image
 import torch
 import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
