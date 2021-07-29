@@ -8,6 +8,7 @@ import torchvision
 import numpy as np
 import random
 from PIL import Image
+import matplotlib.image as mpimg
 from coco_utils import get_coco
 import presets
 import utils
@@ -135,8 +136,8 @@ def main(args):
     # Process per sample
     def process(i):
         image_path, target_path = dataset_test.images[i], dataset_test.masks[i]
-        image = Image.open(str(image_path))
-        target = Image.open(str(target_path))
+        image = torch.from_numpy(mpimg.imread(image_path))
+        target = torch.from_numpy(mpimg.imread(target_path))
         #image, target = dataset_test.__getitem__(i)
         print(image.shape)
         print(target.shape)
