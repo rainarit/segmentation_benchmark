@@ -154,14 +154,10 @@ def main(args):
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
 
-        print(logit.shape)
-
         H, W, _ = image.shape
         logit = torch.FloatTensor(logit)[None, ...]
         logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
-        prob = F.softmax(logit, dim=1).numpy()
-
-        print(prob.shape)
+        prob = F.softmax(logit, dim=1)[0].numpy()
 
         prob = postprocessor(image, prob)
 
