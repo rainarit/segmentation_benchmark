@@ -168,7 +168,7 @@ def main(args):
 
     # CRF in multi-process
     results = joblib.Parallel(n_jobs=4, verbose=1, pre_dispatch="all")(
-        [joblib.delayed(process)(i) for i in range(len(dataset_test))]
+        [joblib.delayed(process)(i) for i in tqdm(range(len(dataset_test)))]
     )
     
     for i, result in enumerate(results):   
