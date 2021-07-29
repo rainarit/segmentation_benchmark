@@ -151,13 +151,6 @@ def main(args):
 
         print(image.shape)
 
-        image = np.uint8(255 * image)
-
-        image = image.transpose(2, 1, 0)
-        image = Image.fromarray(image)
-        image = image.resize(size=(480, 480))
-        image = np.asarray(image)
-
         #filename = os.path.join(str(prediction_dir), str(i) + ".png")
         #logit = mpimg.imread(filename).transpose(2, 0, 1)
 
