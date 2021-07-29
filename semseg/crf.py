@@ -159,10 +159,7 @@ def main(args):
         logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
         prob = F.softmax(logit, dim=1)[0].numpy()
 
-        print(logit.shape)
-        print(prob.shape)
-
-        prob = postprocessor(image, logit)
+        prob = postprocessor(image, prob)
 
         return prob, target
 
