@@ -49,6 +49,8 @@ class DenseCRF(object):
         U = utils_crf.unary_from_softmax(probmap)
         U = np.ascontiguousarray(U)
 
+        print(U.shape)
+
         image = np.ascontiguousarray(image)
 
         print(image.shape)
@@ -158,11 +160,9 @@ def main(args):
         image = Image.fromarray(image)
         image = image.resize(size=(480, 480))
         image = np.asarray(image)
-        print(image.shape)
 
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
         logit = mpimg.imread(filename).transpose(2, 0, 1)
-        #logit = torch.from_numpy(logit)
 
         prob = postprocessor(image, logit)
 
