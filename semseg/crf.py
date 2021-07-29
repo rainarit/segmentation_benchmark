@@ -166,10 +166,10 @@ def main(args):
 
         return prob, target
 
-    # CRF in multi-process
-    results = joblib.Parallel(n_jobs=-1, verbose=1, pre_dispatch="all")(
-        [(process)(i) for i in tqdm(range(len(dataset_test)))]
-    )
+    ## CRF in multi-process
+    #results = joblib.Parallel(n_jobs=-1, verbose=1, pre_dispatch="all")(
+    #    [(process)(i) for i in tqdm(range(len(dataset_test)))]
+    #)
     
     for i, result in enumerate(results):   
         preds, gts = result[0], result[1]
