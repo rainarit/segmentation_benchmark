@@ -180,7 +180,7 @@ def main(args):
         writer.flush()
 
     pool = Pool()                         # Create a multiprocessing Pool
-    pool.map(multi_proc, range(len(dataset_test)))  # process data_inputs iterable with pool
+    pool.map(multi_proc, list(range(len(dataset_test))))  # process data_inputs iterable with pool
     
     #for i in tqdm(range(len(dataset_test))):   
     #    preds, gts = process(i)
