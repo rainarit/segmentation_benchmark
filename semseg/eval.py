@@ -249,7 +249,7 @@ def main(args):
             target_image.save(str(filename))
 
             # Saving Prediction Image
-            prediction_in = get_mask(output).transpose(1, 2, 0)
+            prediction_in = get_mask(output).transpose(2, 0, 1)
             print(prediction_in.shape)
             prediction_image = Image.fromarray((prediction_in * 255).astype(np.uint8))
             filename = os.path.join(prediction_dir, str(idx) + ".png")
