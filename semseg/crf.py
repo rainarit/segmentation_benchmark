@@ -179,8 +179,8 @@ def main(args):
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
         writer.flush()
 
-    pool = Pool()                         # Create a multiprocessing Pool
-    pool.map(multi_proc, list(range(len(dataset_test))))  # process data_inputs iterable with pool
+    a_pool = Pool()                        # Create a multiprocessing Pool
+    a_pool.map(multi_proc, range(len(dataset_test)))
     
     #for i in tqdm(range(len(dataset_test))):   
     #    preds, gts = process(i)
