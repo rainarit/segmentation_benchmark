@@ -240,7 +240,7 @@ def main(args):
             processed_image_in = image[0].cpu().numpy().transpose(1, 2, 0)
             processed_image = Image.fromarray((processed_image_in * 255).astype(np.uint8))
             filename = os.path.join(processed_image_dir, str(idx) + ".png")
-            processed_image.save(str(processed_image))
+            processed_image.save(str(filename))
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
