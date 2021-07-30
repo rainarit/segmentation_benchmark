@@ -209,21 +209,6 @@ def get_args_parser(add_help=True):
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/semseg/output', help='path where to save')
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
-    parser.add_argument('--resume', default='', help='resume from checkpoint')
-    parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
-                        help='start epoch')
-    parser.add_argument(
-        "--test-only",
-        dest="test_only",
-        help="Only test the model",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--pretrained",
-        dest="pretrained",
-        help="Use pre-trained models from the modelzoo",
-        action="store_true",
-    )
     # distributed training parameters
     parser.add_argument('--world-size', default=1, type=int,
                         help='number of distributed processes')
