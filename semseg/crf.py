@@ -174,14 +174,16 @@ def main(args):
     def process(i):
         image, target = dataset_test.__getitem__(i)
 
-        writer.add_image('Images/image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/target', target[0], iterator.train_step, dataformats='HW')
+        writer.add_image('Images/image', image[0], i, dataformats='CHW')
+        writer.add_image('Images/target', target[0], i, dataformats='HW')
 
         image = image.cpu().numpy()
         image = np.uint8(255 * image).transpose(1, 2, 0)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
+
+        print(logit.shape)
 
         H, W, _ = image.shape
         logit = torch.FloatTensor(logit)[None, ...]
@@ -196,10 +198,6 @@ def main(args):
 
         return label, target
 
-    ## CRF in multi-process
-    #results = joblib.Parallel(n_jobs=-1, verbose=1, pre_dispatch="all")(
-    #    [(process)(i) for i in tqdm(range(len(dataset_test)))]
-    #)
     
     for i in tqdm(range(len(dataset_test))):   
         preds, gts = process(i)
