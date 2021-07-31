@@ -67,6 +67,17 @@ class DenseCRF(object):
 
         return Q
 
+def get_mask(output):
+    output_predictions = output.argmax(0)
+    # create a color pallette, selecting a color for each class
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    colors = (colors % 255).numpy().astype("uint8")
+    # plot the semantic segmentation predictions of 21 classes in each color
+    r = Image.fromarray(output_predictions.byte().cpu().numpy()).resize((480,480))
+    r.putpalette(colors)
+    return np.array(r.convert('RGB'))
+
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
@@ -175,7 +186,7 @@ def main(args):
 
         prob = postprocessor(image, prob)
 
-        print(prob.shape)
+        print(get_mask(prob).shape)
 
         label = np.argmax(prob, axis=0)
 
