@@ -174,8 +174,8 @@ def main(args):
     def process(i):
         image, target = dataset_test.__getitem__(i)
 
-        writer.add_image('Images/image', image[0], i, dataformats='CHW')
-        writer.add_image('Images/target', target[0], i, dataformats='HW')
+        writer.add_image('Images/image', image, i, dataformats='CHW')
+        writer.add_image('Images/target', target, i, dataformats='HW')
 
         image = image.cpu().numpy()
         image = np.uint8(255 * image).transpose(1, 2, 0)
