@@ -107,6 +107,18 @@ def main(args):
         bi_w=4,
     )
 
+    # Path to CRF images
+    crf_dir = os.path.join(
+        args.output_dir,
+        "features",
+        "voc12",
+        args.model.lower(),
+        "val",
+        "crf",
+    )
+    utils.mkdir(crf_dir)
+    print("CRF dst:", crf_dir)
+
     # Path to prediction images
     prediction_dir = os.path.join(
         args.output_dir,
@@ -150,7 +162,6 @@ def main(args):
     # Process per sample
     def process(i):
         image, target = dataset_test.__getitem__(i)
-
         image = image.cpu().numpy()
         image = np.uint8(255 * image).transpose(1, 2, 0)
 
@@ -164,6 +175,8 @@ def main(args):
 
         prob = postprocessor(image, prob)
 
+        print(prob.shape)
+
         label = np.argmax(prob, axis=0)
 
         return label, target
@@ -175,6 +188,7 @@ def main(args):
     
     for i in tqdm(range(len(dataset_test))):   
         preds, gts = process(i)
+
         confmat.update(gts.flatten(), preds.flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
         print("Mean IoU: {}".format(confmat.get_IoU()))
