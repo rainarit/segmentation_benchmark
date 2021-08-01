@@ -188,7 +188,7 @@ def main(args):
         
 
 
-        writer.add_image('Images/Pre-CRF', transforms.ToTensor()(original_logit_image).unsqueeze_(0), i, dataformats='HWC')
+        writer.add_image('Images/Pre-CRF', transforms.ToTensor()(original_logit_image).unsqueeze_(0)[0], i, dataformats='HWC')
 
 
         H, W, _ = image.shape
