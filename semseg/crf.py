@@ -69,7 +69,6 @@ class DenseCRF(object):
 
 def get_mask(output):
     output_predictions = output.argmax(0)
-    print(output_predictions.shape)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
@@ -193,7 +192,8 @@ def main(args):
 
         prob = postprocessor(image, prob)
 
-        print(get_mask(prob).shape)
+
+        print(get_mask(torch.from_numpy(prob)).shape)
 
         label = np.argmax(prob, axis=0)
 
