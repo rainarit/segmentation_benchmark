@@ -110,7 +110,6 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             writer.flush()
             iterator.add_eval()
-            break
 
         confmat.reduce_from_all_processes()
     return confmat
