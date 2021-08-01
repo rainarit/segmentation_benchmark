@@ -68,7 +68,8 @@ class DenseCRF(object):
         return Q
 
 def get_mask(output):
-    output_predictions = output[0].argmax(0)
+    output_predictions = output.argmax(0)
+    print(output_predictions.shape)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     colors = torch.as_tensor([i for i in range(21)])[:, None] * palette

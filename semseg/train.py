@@ -49,14 +49,12 @@ def get_dataset(dir_path, name, image_set, transform):
     return ds, num_classes
 
 def get_mask(output):
-    print(output.shape)
     output_predictions = output[0].argmax(0)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
     colors = (colors % 255).numpy().astype("uint8")
     # plot the semantic segmentation predictions of 21 classes in each color
-    print(output_predictions.shape)
     r = Image.fromarray(output_predictions.byte().cpu().numpy())
     r.putpalette(colors)
     return np.array(r.convert('RGB'))
