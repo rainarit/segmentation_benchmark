@@ -49,6 +49,7 @@ def get_dataset(dir_path, name, image_set, transform):
     return ds, num_classes
 
 def get_mask(output):
+    print(output.shape)
     output_predictions = output[0].argmax(0)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
