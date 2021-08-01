@@ -182,8 +182,9 @@ def main(args):
         image = np.uint8(255 * image).transpose(1, 2, 0)
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
-        logit = np.load(filename)[0]
-
+        logit = np.load(filename)
+        print(logit.shape)
+        logit = logit[0]
         print(logit.shape)
 
         H, W, _ = image.shape
