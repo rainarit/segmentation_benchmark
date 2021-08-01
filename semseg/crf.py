@@ -20,6 +20,7 @@ import json
 from tqdm import tqdm
 import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils_crf
+from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
@@ -174,9 +175,6 @@ def main(args):
     def process(i):
         image, target = dataset_test.__getitem__(i)
 
-        writer.add_image('Images/image', image, i, dataformats='CHW')
-        writer.add_image('Images/target', target, i, dataformats='HW')
-
         image = image.cpu().numpy()
         image = np.uint8(255 * image).transpose(1, 2, 0)
 
@@ -187,8 +185,10 @@ def main(args):
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
         original_logit_image = Image.open(filename)
 
+        
 
-        writer.add_image('Images/Pre-CRF', original_logit_image, i, dataformats='HWC')
+
+        writer.add_image('Images/Pre-CRF', transforms.ToTensor()(original_logit_image).unsqueeze_(0), i, dataformats='HWC')
 
 
         H, W, _ = image.shape
