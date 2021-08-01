@@ -193,7 +193,11 @@ def main(args):
         prob = postprocessor(image, prob)
 
 
-        print(get_mask(torch.from_numpy(prob)).shape)
+        # Saving Post-CRF Image
+        prob_mask = get_mask(torch.from_numpy(prob))
+        prob_image = Image.fromarray((prob_mask * 255).astype(np.uint8))
+        filename = os.path.join(crf_dir, str(i) + ".png")
+        prob_image.save(str(filename))
 
         label = np.argmax(prob, axis=0)
 
