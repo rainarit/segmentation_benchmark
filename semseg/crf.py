@@ -185,7 +185,7 @@ def main(args):
         filename = os.path.join(str(prediction_dir), str(i) + ".png")
         original_logit_image = Image.open(filename)
 
-        writer.add_image('Images/Post-CRF', np.array(original_logit_image), i, dataformats='HWC')
+        writer.add_image('Images/Pre-CRF', np.array(original_logit_image), i, dataformats='HWC')
 
         H, W, _ = image.shape
         logit = torch.FloatTensor(logit)[None, ...]
