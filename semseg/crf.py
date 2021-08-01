@@ -184,6 +184,13 @@ def main(args):
         logit = np.load(filename)
         logit = logit[0]
 
+        filename = os.path.join(str(prediction_dir), str(i) + ".png")
+        original_logit_image = Image.open(filename)
+
+
+        writer.add_image('Images/Pre-CRF', original_logit_image, i, dataformats='HWC')
+
+
         H, W, _ = image.shape
         logit = torch.FloatTensor(logit)[None, ...]
         logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
@@ -195,6 +202,8 @@ def main(args):
         # Saving Post-CRF Image
         prob_mask = get_mask(torch.from_numpy(prob))
         prob_image = Image.fromarray((prob_mask * 255).astype(np.uint8))
+        writer.add_image('Images/Post-CRF', prob_image, i, dataformats='HWC')
+        writer.flush()
         filename = os.path.join(crf_dir, str(i) + ".png")
         prob_image.save(str(filename))
 
