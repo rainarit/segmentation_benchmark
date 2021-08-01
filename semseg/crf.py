@@ -68,7 +68,7 @@ class DenseCRF(object):
         return Q
 
 def get_mask(output):
-    output_predictions = output.argmax(0)
+    output_predictions = output[0].argmax(0)
     # create a color pallette, selecting a color for each class
     palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
@@ -183,9 +183,7 @@ def main(args):
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)
-        print(logit.shape)
         logit = logit[0]
-        print(logit.shape)
 
         H, W, _ = image.shape
         logit = torch.FloatTensor(logit)[None, ...]
