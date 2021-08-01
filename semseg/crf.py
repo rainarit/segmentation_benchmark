@@ -205,7 +205,6 @@ def main(args):
     
     for i in tqdm(range(len(dataset_test))):   
         preds, gts = process(i)
-        break
 
         confmat.update(gts.flatten(), preds.flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
