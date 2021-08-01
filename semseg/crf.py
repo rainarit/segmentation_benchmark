@@ -198,7 +198,7 @@ def main(args):
         # Saving Post-CRF Image
         prob_mask = get_mask(torch.from_numpy(prob))
         prob_image = Image.fromarray((prob_mask * 255).astype(np.uint8))
-        writer.add_image('Images/Post-CRF', prob_image, i, dataformats='HWC')
+        writer.add_image('Images/Post-CRF', np.array(prob_image), i, dataformats='HWC')
         writer.flush()
         filename = os.path.join(crf_dir, str(i) + ".png")
         prob_image.save(str(filename))
