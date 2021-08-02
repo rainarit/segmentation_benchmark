@@ -102,7 +102,7 @@ class GaborFilterBank(nn.Module):
                                                            self.l_sfs,
                                                            self.l_phase,
                                                            contrast=self.contrast)
-            print(filter_weights.shape)
+            #print(filter_weights.shape)
             curr_conv = nn.Conv2d(in_channels=in_channels,
                                   out_channels=filter_weights.shape[0],
                                   kernel_size=sz, stride=stride,
