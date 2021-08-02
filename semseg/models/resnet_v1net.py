@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
-from divisive_norm_exc_inh import DivNormExcInh
+from .divisive_norm_exc_inh import DivNormExcInh
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
