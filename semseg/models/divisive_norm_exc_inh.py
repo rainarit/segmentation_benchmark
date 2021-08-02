@@ -195,7 +195,7 @@ class DivNormExcInh(nn.Module):
         else:
             simple_cells = nn.Identity(x)
         # # Divisive normalization, Schwartz and Simoncelli 2001
-        simple_cells = torch.pow(simple_cells, 2)
+        simple_cells = torch.pow(simple_cells, float(2))
         norm = self.div(simple_cells) + self.sigma**2 + torch.tensor(1e-8)
         simple_cells = simple_cells / norm
         # Inhibitory cells (subtractive)
