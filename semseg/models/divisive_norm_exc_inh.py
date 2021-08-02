@@ -2,6 +2,7 @@
 import torch  # pylint: disable=import-error
 import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
+import numpy as np
 
 def genGabor(sz, theta, gamma, sigma, sf, phi=0, contrast=2):
     """Generate gabor filter based on argument parameters."""
