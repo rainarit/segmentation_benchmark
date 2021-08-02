@@ -3,6 +3,20 @@ import torch  # pylint: disable=import-error
 import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
 
+def genGabor(sz, theta, gamma, sigma, sf, phi=0, contrast=2):
+    """Generate gabor filter based on argument parameters."""
+    location = (sz[0] // 2, sz[1] // 2)
+    [x, y] = np.meshgrid(np.arange(sz[0])-location[0],
+                         np.arange(sz[1])-location[1])
+
+    x_theta = x * np.cos(theta) + y * np.sin(theta)
+    y_theta = -x * np.sin(theta) + y * np.cos(theta)
+
+    envelope = .5 * contrast * \
+        np.exp(-(x_theta**2 + (y_theta * gamma)**2)/(2 * sigma**2))
+    gabor = envelope * np.cos(2 * math.pi * x_theta * sf + phi)
+    return gabor
+
 def generate_gabor_filter_weights(sz, l_theta, l_sfs,
                                   l_phase, gamma=1,
                                   contrast=1, return_dict=False):
