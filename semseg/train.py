@@ -18,7 +18,7 @@ import sys
 import torch
 import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
-import models
+from models.segmentation import _load_model as seg_model
 
 seed=42
 random.seed(seed)
@@ -204,12 +204,12 @@ def main(args):
     #                                                             aux_loss=args.aux_loss,
     #                                                             pretrained=args.pretrained)
 
-    model = models.segmentation._load_model(arch_type=args.model, 
-                                            backbone=args.backbone, 
-                                            pretrained=False, 
-                                            progress=True, 
-                                            num_classes=num_classes, 
-                                            aux_loss=args.aux_loss)
+    model = seg_model(arch_type=args.model, 
+                      backbone=args.backbone,
+                      pretrained=False,
+                      progress=True, 
+                      num_classes=num_classes, 
+                      aux_loss=args.aux_loss)
     model.to(device)
 
     if args.distributed:
