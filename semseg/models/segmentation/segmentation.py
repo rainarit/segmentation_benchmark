@@ -8,8 +8,7 @@ from .fcn import FCN, FCNHead
 from .deeplabv3 import DeepLabV3, DeepLabHead
 
 
-__all__ = ['fcn_resnet50', 'fcn_resnet101', 'deeplabv3_resnet50', 'deeplabv3_resnet101',
-           'deeplabv3_mobilenet_v3_large', 'lraspp_mobilenet_v3_large']
+__all__ = ['fcn_resnet50', 'fcn_resnet101', 'deeplabv3_resnet50', 'deeplabv3_resnet101']
 
 
 model_urls = {
