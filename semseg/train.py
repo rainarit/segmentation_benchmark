@@ -18,7 +18,7 @@ import sys
 import torch
 import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
-import models.segmentation
+from models.segmentation.segmentation import _load_model
 
 seed=42
 random.seed(seed)
@@ -204,7 +204,7 @@ def main(args):
     #                                                             aux_loss=args.aux_loss,
     #                                                             pretrained=args.pretrained)
 
-    model = models.segmentation._load_model(arch_type=args.model, 
+    model = _load_model(arch_type=args.model, 
                       backbone=args.backbone,
                       pretrained=False,
                       progress=True, 
