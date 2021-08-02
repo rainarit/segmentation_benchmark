@@ -21,7 +21,8 @@ model_urls = {
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
     if 'resnet_v1net' in backbone_name:
-        backbone = resnet_v1net.__dict__[backbone_name](
+        name = backbone_name.split('resnet_v1net', 1)[1] 
+        backbone = resnet_v1net.__dict__[name](
             pretrained=pretrained_backbone,
             replace_stride_with_dilation=[False, True, True])
         out_layer = 'layer4'
