@@ -53,6 +53,8 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
         'deeplabv3': (DeepLabHead, DeepLabV3),
         'fcn': (FCNHead, FCN),
     }
+    print(name)
+    print(backbone_name)
     classifier = model_map[name][0](out_inplanes, num_classes)
     base_model = model_map[name][1]
 
@@ -64,9 +66,6 @@ def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss
     if pretrained:
         aux_loss = True
         kwargs["pretrained_backbone"] = False
-    print(arch_type)
-    print(backbone)
-    print(pretrained)
     model = _segm_model(arch_type, backbone, num_classes, aux_loss, **kwargs)
     if pretrained:
         _load_weights(model, arch_type, backbone, progress)
