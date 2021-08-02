@@ -2,8 +2,40 @@
 import torch  # pylint: disable=import-error
 import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
-from early_vision.models.divisive_normalization.gabor_filter_bank import GaborFilterBank
 
+def generate_gabor_filter_weights(sz, l_theta, l_sfs,
+                                  l_phase, gamma=1,
+                                  contrast=1, return_dict=False):
+    """Generate a bank of gabor filter weights.
+    Args:
+      sz: (filter height, filter width), +-2 SD of gaussian envelope
+      l_theta: List of gabor orientations
+      l_sfs: List of spatial frequencies, cycles per SD of envelope
+      l_phase: List of gabor phase
+    Returns:
+      gabor filter weights with parameters sz X l_theta X l_sfs X l_phase
+    """
+    gabor_bank = []
+    theta2filter = {}
+    for theta in l_theta:
+        curr_filters = []
+        for sf in l_sfs:
+            for phase in l_phase:
+                g = genGabor(sz=(sz, sz), theta=theta,
+                             gamma=gamma, sigma=sz/4,
+                             sf=sf/sz, phi=phase,
+                             contrast=contrast)
+                gabor_bank.append(g)
+                curr_filters.append(g)
+        theta2filter[theta] = torch.from_numpy(
+            np.array(curr_filters, dtype=np.float32))
+    theta2filter = {t: torch.unsqueeze(g_b, 1)
+                    for t, g_b in theta2filter.items()}
+    gabor_bank = np.array(gabor_bank, dtype=np.float32)
+    gabor_bank = np.expand_dims(gabor_bank, 1)
+    if return_dict:
+        return gabor_bank, theta2filter
+    return gabor_bank
 
 def nonnegative_weights_init(m):
     """Non-negative initialization of weights."""
@@ -25,6 +57,54 @@ def orthogonal_weights_init(m):
     else:
         m.data.zero_()
 
+class GaborFilterBank(nn.Module):
+    """Implements linear filtering using a Gabor Filter Bank."""
+
+    def __init__(self,
+                 in_channels,
+                 l_filter_size,
+                 l_theta,
+                 l_sfs,
+                 l_phase,
+                 padding_mode='zeros',
+                 contrast=1.,
+                 stride=1,
+                 device='cuda',
+                 ):
+        super(GaborFilterBank, self).__init__()
+        self.l_filter_size = [int(i) for i in l_filter_size]
+        self.l_theta = l_theta
+        self.l_sfs = l_sfs
+        self.l_phase = l_phase
+        self.contrast = contrast
+        self.gabor_convs = []
+        self.out_dim = len(l_filter_size) * len(l_theta) * \
+            len(l_sfs) * len(l_phase)
+
+        for _, sz in enumerate(self.l_filter_size):
+            filter_weights = generate_gabor_filter_weights(sz, self.l_theta,
+                                                           self.l_sfs,
+                                                           self.l_phase,
+                                                           contrast=self.contrast)
+            print(filter_weights.shape)
+            curr_conv = nn.Conv2d(in_channels=in_channels,
+                                  out_channels=filter_weights.shape[0],
+                                  kernel_size=sz, stride=stride,
+                                  padding=(sz - 1) // 2,
+                                  padding_mode=padding_mode,
+                                  bias=False).to(device)
+            with torch.no_grad():
+                curr_conv.weight.copy_(
+                    torch.from_numpy(filter_weights).float())
+                curr_conv.weight.requires_grad = False
+            self.gabor_convs.append(curr_conv)
+
+    def forward(self, x):
+        outputs = []
+        for conv in self.gabor_convs:
+            outputs.append(conv(x))
+        outputs = torch.cat(outputs, 1)
+        return outputs
 
 class DivNormExcInh(nn.Module):
     """
