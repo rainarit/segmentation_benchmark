@@ -21,8 +21,8 @@ model_urls = {
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
     if 'resnet_v1net' in backbone_name:
-        name = backbone_name.split('resnet_v1net', 1)[1] 
-        backbone = resnet_v1net.__dict__[name](
+        back_name = backbone_name.split('resnet_v1net', 1)[1] 
+        backbone = resnet_v1net.__dict__[back_name](
             pretrained=pretrained_backbone,
             replace_stride_with_dilation=[False, True, True])
         out_layer = 'layer4'
@@ -53,8 +53,6 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
         'deeplabv3': (DeepLabHead, DeepLabV3),
         'fcn': (FCNHead, FCN),
     }
-    print(name)
-    print(backbone_name)
     classifier = model_map[name][0](out_inplanes, num_classes)
     base_model = model_map[name][1]
 
