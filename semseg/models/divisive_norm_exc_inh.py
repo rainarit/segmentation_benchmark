@@ -182,7 +182,7 @@ class DivNormExcInh(nn.Module):
         # nonnegative_weights_init(self.e_i)
         nonnegative_weights_init(self.div)
 
-    def forward(self, x, use_gabor=True):
+    def forward(self, x, use_gabor=False):
         """
         params:
           x: Input grayscale image tensor
