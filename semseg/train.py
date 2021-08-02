@@ -18,6 +18,7 @@ import sys
 import torch
 import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
+from . import models
 
 seed=42
 random.seed(seed)
@@ -199,9 +200,16 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-                                                                 aux_loss=args.aux_loss,
-                                                                 pretrained=args.pretrained)
+    #model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
+    #                                                             aux_loss=args.aux_loss,
+    #                                                             pretrained=args.pretrained)
+
+    model = models.segmentation._load_model(arch_type=args.model, 
+                                            backbone=args.backbone, 
+                                            pretrained=False, 
+                                            progress=True, 
+                                            num_classes=num_classes, 
+                                            aux_loss=args.aux_loss)
     model.to(device)
 
     if args.distributed:
@@ -276,7 +284,8 @@ def get_args_parser(add_help=True):
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
-    parser.add_argument('--model', default='fcn_resnet101', help='model')
+    parser.add_argument('--model', default='deeplabv3', help='model')
+    parser.add_argument('--backbone', default='resnet101', help='backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=8, type=int)
