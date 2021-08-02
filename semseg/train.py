@@ -18,7 +18,7 @@ import sys
 import torch
 import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
-from . import models
+import models
 
 seed=42
 random.seed(seed)
