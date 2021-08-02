@@ -3,6 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
+from divisive_norm_exc_inh import DivNormExcInh
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -173,6 +174,7 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
+        self.div = DivNormExcInh(1, [15, 21], [0, 45, 90, 135], [2, 3], [0, 90, 180, 270], 7)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
@@ -227,10 +229,12 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor) -> Tensor:
+    def _forward_impl(self, x: Tensor, use_bn1=True) -> Tensor:
         # See note [TorchScript super()]
         x = self.conv1(x)
-        x = self.bn1(x)
+        x = self.div(x)['out']
+        if use_bn1:
+            x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
 
