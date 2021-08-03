@@ -123,6 +123,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     header = 'Epoch: [{}]'.format(epoch)
 
     for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        print(idx)
 
         image, target = image.to(device), target.to(device)
         output = model(image)
