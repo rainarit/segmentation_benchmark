@@ -173,7 +173,9 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
+
         self.div = DivNormExcInh(1, [15, 21], [0, 45, 90, 135], [2, 3], [0, 90, 180, 270], 7)
+
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
@@ -232,8 +234,10 @@ class ResNet(nn.Module):
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.div(x)['out']
+
         if use_bn1:
             x = self.bn1(x)
+            
         x = self.relu(x)
         x = self.maxpool(x)
 
