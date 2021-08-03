@@ -208,5 +208,5 @@ class DivNormExcInh(nn.Module):
                   'norm': norm
                   }
         output = simple_cells
-        print(output)
+        print("output: ", output)
         return output
