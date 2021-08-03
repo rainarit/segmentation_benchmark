@@ -141,7 +141,7 @@ class Bottleneck(nn.Module):
         return out
 
 
-class ResNet(nn.Module):
+class ResNet_V1Net(nn.Module):
 
     def __init__(
         self,
@@ -253,6 +253,7 @@ class ResNet(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
+        print("FORWARDAAKLUYKFJTKGUHI>UGYFKH")
         return self._forward_impl(x)
 
 
@@ -264,7 +265,7 @@ def _resnet(
     progress: bool,
     **kwargs: Any
 ) -> ResNet:
-    model = ResNet(block, layers, **kwargs)
+    model = ResNet_V1Net(block, layers, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
