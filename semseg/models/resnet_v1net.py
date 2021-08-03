@@ -79,6 +79,7 @@ class BasicBlock(nn.Module):
 
         out += identity
         out = self.relu(out)
+        print("BasicBlock")
 
         return out
 
@@ -137,6 +138,7 @@ class Bottleneck(nn.Module):
 
         out += identity
         out = self.relu(out)
+        print("BottleNeck")
 
         return out
 
@@ -232,6 +234,7 @@ class ResNet_V1Net(nn.Module):
 
     def _forward_impl(self, x: Tensor, use_bn1=True) -> Tensor:
         # See note [TorchScript super()]
+        print("FORWARDAAKLUYKFJTKGUHI>UGYFKH")
         x = self.conv1(x)
         x = self.div(x)['out']
 
