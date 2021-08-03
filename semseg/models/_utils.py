@@ -60,7 +60,8 @@ class IntermediateLayerGetter(nn.ModuleDict):
         count = 0
         out = OrderedDict()
         for name, module in self.items():
-            print(count)
+            
+            print("count: ", count, "\tname: ", name, "\tmodule:", module)
             count += 1
             x = module(x)
             if name in self.return_layers:
