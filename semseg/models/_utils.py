@@ -57,11 +57,8 @@ class IntermediateLayerGetter(nn.ModuleDict):
         self.return_layers = orig_return_layers
 
     def forward(self, x):
-        count = 0
         out = OrderedDict()
         for name, module in self.items():
-            #print("count: ", count, "\tname: ", name, "\tmodule:", module)
-            count += 1
             x = module(x)
             if name in self.return_layers:
                 out_name = self.return_layers[name]
