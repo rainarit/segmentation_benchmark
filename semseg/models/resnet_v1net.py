@@ -237,7 +237,8 @@ class ResNet(nn.Module):
 
         if use_bn1:
             x = self.bn1(x)
-            
+
+        print(type(x))
         x = self.relu(x)
         x = self.maxpool(x)
 
