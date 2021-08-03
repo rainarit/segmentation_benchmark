@@ -193,6 +193,7 @@ class DivNormExcInh(nn.Module):
         if use_gabor == True:
             simple_cells = F.relu(self.gfb(x))
         else:
+            print(x)
             simple_cells = nn.Identity(x)
         # # Divisive normalization, Schwartz and Simoncelli 2001
         simple_cells = torch.pow(simple_cells, 2)
