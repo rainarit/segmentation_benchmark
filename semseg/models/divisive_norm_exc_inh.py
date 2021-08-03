@@ -204,8 +204,8 @@ class DivNormExcInh(nn.Module):
         excitation = self.e_e(simple_cells)
         simple_cells = simple_cells + excitation  - inhibition
         simple_cells = F.relu(simple_cells)
-        output = {'out': simple_cells,
-                  'norm': norm
-                  }
+        #output = {'out': simple_cells,
+        #          'norm': norm
+        #          }
         output = simple_cells
         return output
