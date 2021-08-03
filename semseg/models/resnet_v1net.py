@@ -234,6 +234,7 @@ class ResNet(nn.Module):
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.div(x)['out']
+        print("HELLOO!!")
 
         if use_bn1:
             x = self.bn1(x)
