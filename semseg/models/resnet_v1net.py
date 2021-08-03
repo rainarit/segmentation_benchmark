@@ -264,7 +264,7 @@ def _resnet(
     pretrained: bool,
     progress: bool,
     **kwargs: Any
-) -> ResNet:
+) -> ResNet_V1Net:
     model = ResNet_V1Net(block, layers, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
