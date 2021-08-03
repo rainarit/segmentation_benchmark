@@ -193,9 +193,9 @@ class DivNormExcInh(nn.Module):
         if use_gabor == True:
             simple_cells = F.relu(self.gfb(x))
         else:
-            simple_cells = nn.Identity(x)
+            simple_cells = x
         # # Divisive normalization, Schwartz and Simoncelli 2001
-        simple_cells = torch.pow(simple_cells, float(2))
+        simple_cells = torch.pow(simple_cells, 2)
         norm = self.div(simple_cells) + self.sigma**2 + torch.tensor(1e-8)
         simple_cells = simple_cells / norm
         # Inhibitory cells (subtractive)
