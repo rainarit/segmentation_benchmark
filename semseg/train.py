@@ -126,7 +126,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
 
         image, target = image.to(device), target.to(device)
-        ipdb.set_trace()
         output = model(image)
 
         loss = criterion(output, target)
