@@ -259,6 +259,7 @@ def _resnet(
     **kwargs: Any
 ) -> ResNet:
     print("Entered _resnet() function in resnet.py file")
+    print(pretrained)
     model = ResNet(block, layers, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
