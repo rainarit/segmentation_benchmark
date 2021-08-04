@@ -247,6 +247,7 @@ class ResNet(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
+        print("Entered forward")
         return self._forward_impl(x)
 
 
