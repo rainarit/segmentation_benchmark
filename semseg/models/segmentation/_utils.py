@@ -14,9 +14,9 @@ class _SimpleSegmentationModel(nn.Module):
         self.aux_classifier = aux_classifier
 
     def forward(self, x):
-        print("In Simple Seg Models")
         input_shape = x.shape[-2:]
         # contract: features is a dict of tensors
+        print(self.backbone)
         features = self.backbone(x)
 
         result = OrderedDict()
