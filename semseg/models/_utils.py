@@ -46,6 +46,7 @@ class IntermediateLayerGetter(nn.ModuleDict):
         orig_return_layers = return_layers
         return_layers = {str(k): str(v) for k, v in return_layers.items()}
         layers = OrderedDict()
+        print(model)
         for name, module in model.named_children():
             layers[name] = module
             if name in return_layers:
