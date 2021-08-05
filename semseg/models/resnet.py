@@ -119,7 +119,6 @@ class Bottleneck(nn.Module):
         self.stride = stride
 
     def forward(self, x: Tensor) -> Tensor:
-        print("forward() function of BottleNeck")
         identity = x
 
         out = self.conv1(x)
@@ -156,7 +155,6 @@ class ResNet(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(ResNet, self).__init__()
-        print("Enetered ResNet constructor method")
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
