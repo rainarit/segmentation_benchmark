@@ -119,6 +119,7 @@ class Bottleneck(nn.Module):
         self.stride = stride
 
     def forward(self, x: Tensor) -> Tensor:
+        print("forward() function of BottleNeck")
         identity = x
 
         out = self.conv1(x)
@@ -247,7 +248,6 @@ class ResNet(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
-        print("Entered forward")
         return self._forward_impl(x)
 
 
