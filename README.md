@@ -1,6 +1,6 @@
 Status: Active (updates are to be expected)
 
-# V1Net Image Segmentation Benchmark Documentation
+# Bio-inspired Model Image Segmentation Benchmark Documentation
 ## Prerequisites
 #### Install Git Repository
 ```bash
