@@ -20,12 +20,9 @@ import json
 from tqdm import tqdm
 import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils_crf
-from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
-import multiprocessing
-import joblib
 
 seed=42
 random.seed(seed)
@@ -68,17 +65,6 @@ class DenseCRF(object):
 
         return Q
 
-def get_mask(output):
-    output_predictions = output.argmax(0)
-    # create a color pallette, selecting a color for each class
-    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-    colors = (colors % 255).numpy().astype("uint8")
-    # plot the semantic segmentation predictions of 21 classes in each color
-    r = Image.fromarray(output_predictions.byte().cpu().numpy())
-    r.putpalette(colors)
-    return np.array(r.convert('RGB'))
-
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
@@ -119,24 +105,14 @@ def main(args):
         bi_w=4,
     )
 
-    # Path to CRF images
-    crf_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        args.model.lower(),
-        "val",
-        "crf",
-    )
-    utils.mkdir(crf_dir)
-    print("CRF dst:", crf_dir)
+    folder_name = str(args.model) + str(args.backbone)
 
     # Path to prediction images
     prediction_dir = os.path.join(
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "prediction",
     )
@@ -146,7 +122,7 @@ def main(args):
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "logit",
     )
@@ -160,7 +136,7 @@ def main(args):
         args.output_dir,
         "scores",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
     )
 
@@ -175,45 +151,27 @@ def main(args):
     def process(i):
         image, target = dataset_test.__getitem__(i)
 
-        image = image.cpu().numpy()
-        image = np.uint8(255 * image).transpose(1, 2, 0)
-
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
-        logit = np.load(filename)
-        logit = logit[0]
+        logit = np.load(filename)[0]
 
-        filename = os.path.join(str(prediction_dir), str(i) + ".png")
-        original_logit_image = Image.open(filename)
-
-        writer.add_image('Images/Pre-CRF', np.array(original_logit_image), i, dataformats='HWC')
-
-        H, W, _ = image.shape
+        _, H, W = image.shape
         logit = torch.FloatTensor(logit)[None, ...]
         logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
         prob = F.softmax(logit, dim=1)[0].numpy()
+        image = image.numpy().astype(np.uint8).transpose(1, 2, 0)
 
         prob = postprocessor(image, prob)
-
-
-        # Saving Post-CRF Image
-        prob_mask = get_mask(torch.from_numpy(prob))
-        prob_image = Image.fromarray((prob_mask * 255).astype(np.uint8))
-        writer.add_image('Images/Post-CRF', np.array(prob_image), i, dataformats='HWC')
-        writer.flush()
-        filename = os.path.join(crf_dir, str(i) + ".png")
-        prob_image.save(str(filename))
 
         label = np.argmax(prob, axis=0)
 
         return label, target
 
-    
-    for i in tqdm(range(len(dataset_test))):   
-        preds, gts = process(i)
-
-        confmat.update(gts.flatten(), preds.flatten())
+    for i in tqdm(range(len(dataset_test))):
+        image, target = process(i)
+        writer.add_image('Images/image', image, i, dataformats='HW')
+        writer.add_image('Images/target', target, i, dataformats='HW')
+        confmat.update(target.flatten(), image.flatten())
         writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
-        print("Mean IoU: {}".format(confmat.get_IoU()))
         writer.flush()
     
     confmat.reduce_from_all_processes()
@@ -228,7 +186,8 @@ def get_args_parser(add_help=True):
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
-    parser.add_argument('--model', default='fcn_resnet101', help='model')
+    parser.add_argument('--model', default='deeplabv3', help='model')
+    parser.add_argument('--backbone', default='resnet101', help='backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=8, type=int)
@@ -245,6 +204,21 @@ def get_args_parser(add_help=True):
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/semseg/output', help='path where to save')
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
+    parser.add_argument('--resume', default='', help='resume from checkpoint')
+    parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
+                        help='start epoch')
+    parser.add_argument(
+        "--test-only",
+        dest="test_only",
+        help="Only test the model",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--pretrained",
+        dest="pretrained",
+        help="Use pre-trained models from the modelzoo",
+        action="store_true",
+    )
     # distributed training parameters
     parser.add_argument('--world-size', default=1, type=int,
                         help='number of distributed processes')

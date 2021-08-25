@@ -17,10 +17,10 @@ import torch
 import json
 import matplotlib.image as mpimg
 from torchvision.utils import save_image
+from models.segmentation.segmentation import _load_model
 import ipdb
 
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
 
 seed=42
 random.seed(seed)
@@ -69,12 +69,14 @@ def get_mask(output):
 
 def main(args):
 
+    folder_name = str(args.model) + str(args.backbone)
+
     # Path to save logits
     logit_dir = os.path.join(
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "logit",
     )
@@ -86,7 +88,7 @@ def main(args):
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "image",
     )
@@ -98,7 +100,7 @@ def main(args):
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "processed_image",
     )
@@ -110,7 +112,7 @@ def main(args):
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "ground_truth",
     )
@@ -122,7 +124,7 @@ def main(args):
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "prediction",
     )
@@ -134,7 +136,7 @@ def main(args):
         args.output_dir,
         "features",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
         "target",
     )
@@ -146,7 +148,7 @@ def main(args):
         args.output_dir,
         "scores",
         "voc12",
-        args.model.lower(),
+        folder_name.lower(),
         "val",
     )
     utils.mkdir(save_dir)
@@ -172,14 +174,18 @@ def main(args):
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1,
+        dataset_test, batch_size=1, shuffle=False,
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
 
-    model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-                                                                 aux_loss=args.aux_loss,
-                                                                 pretrained=args.pretrained)
+    model = _load_model(arch_type=args.model, 
+                      backbone=args.backbone,
+                      pretrained=False,
+                      progress=True, 
+                      num_classes=num_classes, 
+                      aux_loss=args.aux_loss)
+
     model.to(torch.device('cuda'))
 
     if args.distributed:
@@ -204,7 +210,7 @@ def main(args):
         params_to_optimize,
         lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/output_models/model_28.pth", map_location='cpu')
+    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/output_models/checkpoint.pth", map_location='cpu')
     model_without_ddp.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
 
@@ -217,8 +223,10 @@ def main(args):
     header = 'Test:'
 
     with torch.no_grad():
-        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader_test, 1, header)):
+        for idx, (image, target) in tqdm(enumerate(dataset_test)):
             image, target = image.to(device), target.to(device)
+            image = image.unsqueeze(0)
+            target = target.unsqueeze(0)
             output = model(image)
             output = output['out']
 
@@ -272,12 +280,10 @@ def get_args_parser(add_help=True):
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
     parser.add_argument('--dataset', default='coco', help='dataset name')
-    parser.add_argument('--model', default='fcn_resnet101', help='model')
+    parser.add_argument('--model', default='deeplabv3', help='model')
+    parser.add_argument('--backbone', default='resnet101', help='backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
-    parser.add_argument('-b', '--batch-size', default=8, type=int)
-    parser.add_argument('--epochs', default=30, type=int, metavar='N',
-                        help='number of total epochs to run')
     parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
                         help='number of data loading workers (default: 16)')
     parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
@@ -288,22 +294,6 @@ def get_args_parser(add_help=True):
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/semseg/output', help='path where to save')
-    parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
-    parser.add_argument('--resume', default='', help='resume from checkpoint')
-    parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
-                        help='start epoch')
-    parser.add_argument(
-        "--test-only",
-        dest="test_only",
-        help="Only test the model",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--pretrained",
-        dest="pretrained",
-        help="Use pre-trained models from the modelzoo",
-        action="store_true",
-    )
     # distributed training parameters
     parser.add_argument('--world-size', default=1, type=int,
                         help='number of distributed processes')
@@ -313,5 +303,4 @@ def get_args_parser(add_help=True):
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
-    writer = SummaryWriter(str(args.tensorboard_dir))
     main(args)

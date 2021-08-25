@@ -138,7 +138,8 @@ class DivNormExcInh(nn.Module):
     def __init__(self,
                  in_channels,
                  l_filter_size,
-                 l_theta, l_sfs,
+                 l_theta, 
+                 l_sfs,
                  l_phase,
                  divnorm_fsize=5,
                  exc_fsize=9,
@@ -182,7 +183,7 @@ class DivNormExcInh(nn.Module):
         # nonnegative_weights_init(self.e_i)
         nonnegative_weights_init(self.div)
 
-    def forward(self, x, use_gabor=False):
+    def forward(self, x, use_gabor=True):
         """
         params:
           x: Input grayscale image tensor
@@ -190,8 +191,9 @@ class DivNormExcInh(nn.Module):
           output: Output post divisive normalization
         """
         # Gabor filter bank
-        if use_gabor == True:
+        if self.in_channels > 3:
             simple_cells = F.relu(self.gfb(x))
+            print("| Using Gabor Filter Bank |")
         else:
             simple_cells = nn.Identity()(x)
         # # Divisive normalization, Schwartz and Simoncelli 2001

@@ -20,6 +20,7 @@ import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
 from models.segmentation.segmentation import _load_model
 import ipdb
+import  csv
 
 seed=42
 random.seed(seed)
@@ -104,15 +105,15 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
             ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-            writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-            writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-            writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+            if args.rank==0:
+                writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+                writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
+                writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+                writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+                writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
 
-            writer.flush()
-            iterator.add_eval()
-            break
+                writer.flush()
+                iterator.add_eval()
 
         confmat.reduce_from_all_processes()
     return confmat
@@ -142,24 +143,26 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
         ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
 
-        writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-        writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
-        writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-        writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-        writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
+        if args.rank==0:
+            writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
+            writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
+            writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
+            writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
+            writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
 
-        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
+            writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
+            writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
-        writer.flush()
+        if args.rank==0:
+            writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
+            writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
+            writer.flush()
 
-        iterator.add_train()
+            iterator.add_train()
 
     confmat_train.reduce_from_all_processes()
 
@@ -180,6 +183,9 @@ def main(args):
     iterator = utils.Iterator()
 
     device = torch.device(args.device)
+
+    mean_iou = list()
+    checkpoints = list()
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
@@ -212,6 +218,11 @@ def main(args):
                       progress=True, 
                       num_classes=num_classes, 
                       aux_loss=args.aux_loss)
+    
+    #model = torchvision.models.segmentation.__dict__['deeplabv3_resnet101'](num_classes=num_classes,
+    #                                                             aux_loss=args.aux_loss,
+    #                                                             pretrained=args.pretrained)
+    
     model.to(device)
 
     if args.distributed:
@@ -220,7 +231,7 @@ def main(args):
     model_without_ddp = model
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
 
     params_to_optimize = [
@@ -258,6 +269,8 @@ def main(args):
         confmat_iu = confmat.get_IoU()
         confmat_acc_global = confmat.get_acc_global_correct()
 
+        mean_iou.append(confmat_iu)
+
         writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
         writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
         writer.flush()
@@ -269,12 +282,17 @@ def main(args):
             'epoch': epoch,
             'args': args
         }
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
-        utils.save_on_master(
-            checkpoint,
-            os.path.join(args.output_dir, 'checkpoint.pth'))
+        checkpoints.append(checkpoint)
+
+    iou_file = str(args.model) + str(args.backbone) + ".csv"
+    with open(iou_file,"w") as f:
+        wr = csv.writer(f,delimiter="\n")
+        wr.writerow(mean_iou)
+
+    max_iou_index = mean_iou.index(max(mean_iou))
+    utils.save_on_master(
+        checkpoints[max_iou_index],
+        os.path.join(args.output_dir, 'checkpoint.pth'))
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

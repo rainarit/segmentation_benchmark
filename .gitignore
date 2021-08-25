@@ -1,0 +1,15 @@
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.xml
+*.json
+*.txt
+*.csv
+*.zip
+*.tar
+*.pyc
+*.npy
+*.pth
+*.mx
+*.0

@@ -257,8 +257,6 @@ def _resnet(
     progress: bool,
     **kwargs: Any
 ) -> ResNet:
-    print("Entered _resnet() function in resnet.py file")
-    print(pretrained)
     model = ResNet(block, layers, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
@@ -307,7 +305,6 @@ def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    print("Entered resnet101() function in resnet.py file")
     return _resnet('resnet101', Bottleneck, [3, 4, 23, 3], pretrained, progress,
                    **kwargs)
 

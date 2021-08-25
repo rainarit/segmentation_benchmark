@@ -1,7 +1,7 @@
 from .._utils import IntermediateLayerGetter
 from ..utils import load_state_dict_from_url
 from .. import resnet
-from .. import resnet_v1net
+from .. import resnet_divnorm
 
 
 from .fcn import FCN, FCNHead
@@ -20,9 +20,9 @@ model_urls = {
 
 
 def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
-    if 'resnet_v1net' in backbone_name:
-        back_name = backbone_name.split('resnet_v1net', 1)[1] 
-        backbone = resnet_v1net.__dict__[back_name](
+    if 'resnet_divnorm' in backbone_name:
+        back_name = backbone_name.split('resnet_divnorm', 1)[1] 
+        backbone = resnet_divnorm.__dict__[back_name](
             pretrained=pretrained_backbone,
             replace_stride_with_dilation=[False, True, True])
         out_layer = 'layer4'
@@ -43,7 +43,8 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
     return_layers = {out_layer: 'out'}
     if aux:
         return_layers[aux_layer] = 'aux'
-    backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
+    
+    #backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
     aux_classifier = None
     if aux:

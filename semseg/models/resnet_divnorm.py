@@ -3,9 +3,9 @@ from torch import Tensor
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
-from .divisive_norm_exc_inh import DivNormExcInh
+from .divisive_norm_exc_inh import *
 
-__all__ = ['ResNet_V1Net', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
+__all__ = ['ResNet_DivNorm', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
            'wide_resnet50_2', 'wide_resnet101_2']
 
@@ -141,7 +141,7 @@ class Bottleneck(nn.Module):
         return out
 
 
-class ResNet_V1Net(nn.Module):
+class ResNet_DivNorm(nn.Module):
 
     def __init__(
         self,
@@ -154,7 +154,7 @@ class ResNet_V1Net(nn.Module):
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
-        super(ResNet_V1Net, self).__init__()
+        super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
@@ -230,10 +230,11 @@ class ResNet_V1Net(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor, use_bn1=True) -> Tensor:
+    def _forward_impl(self, x: Tensor, use_bn1=False) -> Tensor:
         # See note [TorchScript super()]
+        return_dict = {}
         x = self.conv1(x)
-        x = self.div(x)['out']
+        x = self.div(x)
 
         if use_bn1:
             x = self.bn1(x)
@@ -243,14 +244,16 @@ class ResNet_V1Net(nn.Module):
 
         x = self.layer1(x)
         x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x_layer3 = self.layer3(x)
+        return_dict['aux'] = x_layer3
+        x_layer4 = self.layer4(x_layer3)
+        return_dict['out'] = x_layer4
 
-        x = self.avgpool(x)
+        x = self.avgpool(x_layer4)
         x = torch.flatten(x, 1)
         x = self.fc(x)
 
-        return x
+        return return_dict
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
@@ -263,8 +266,8 @@ def _resnet(
     pretrained: bool,
     progress: bool,
     **kwargs: Any
-) -> ResNet_V1Net:
-    model = ResNet_V1Net(block, layers, **kwargs)
+) -> ResNet_DivNorm:
+    model = ResNet_DivNorm(block, layers, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -273,7 +276,7 @@ def _resnet(
     return model
 
 
-def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -284,7 +287,7 @@ def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -295,7 +298,7 @@ def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -306,7 +309,7 @@ def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-101 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -318,7 +321,7 @@ def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
                    **kwargs)
 
 
-def resnet152(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnet152(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-152 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -329,7 +332,7 @@ def resnet152(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
                    **kwargs)
 
 
-def resnext50_32x4d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnext50_32x4d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNeXt-50 32x4d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_.
     Args:
@@ -342,7 +345,7 @@ def resnext50_32x4d(pretrained: bool = False, progress: bool = True, **kwargs: A
                    pretrained, progress, **kwargs)
 
 
-def resnext101_32x8d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def resnext101_32x8d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNeXt-101 32x8d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_.
     Args:
@@ -355,7 +358,7 @@ def resnext101_32x8d(pretrained: bool = False, progress: bool = True, **kwargs: 
                    pretrained, progress, **kwargs)
 
 
-def wide_resnet50_2(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def wide_resnet50_2(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""Wide ResNet-50-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_.
     The model is the same as ResNet except for the bottleneck number of channels
@@ -371,7 +374,7 @@ def wide_resnet50_2(pretrained: bool = False, progress: bool = True, **kwargs: A
                    pretrained, progress, **kwargs)
 
 
-def wide_resnet101_2(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_V1Net:
+def wide_resnet101_2(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""Wide ResNet-101-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_.
     The model is the same as ResNet except for the bottleneck number of channels
