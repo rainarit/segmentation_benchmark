@@ -239,6 +239,8 @@ def main(args):
         {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
     ]
 
+    
+
     if args.aux_loss:
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})

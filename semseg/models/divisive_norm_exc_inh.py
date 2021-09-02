@@ -108,7 +108,7 @@ class GaborFilterBank(nn.Module):
                                   kernel_size=sz, stride=stride,
                                   padding=(sz - 1) // 2,
                                   padding_mode=padding_mode,
-                                  bias=False).to(device)
+                                  bias=True).to(device)
             with torch.no_grad():
                 curr_conv.weight.copy_(
                     torch.from_numpy(filter_weights).float())
@@ -151,11 +151,16 @@ class DivNormExcInh(nn.Module):
                  ):
         super(DivNormExcInh, self).__init__()
         self.in_channels = in_channels
-        self.gfb = GaborFilterBank(in_channels, l_filter_size,
-                                   l_theta, l_sfs, l_phase, stride=stride,
-                                   padding_mode=padding_mode,
-                                   contrast=1.).to(device)
-        self.hidden_dim = self.gfb.out_dim
+
+        if in_channels <= 3:
+            self.gfb = GaborFilterBank(in_channels, l_filter_size,
+                                       l_theta, l_sfs, l_phase, stride=stride,
+                                       padding_mode=padding_mode,
+                                       contrast=1.).to(device)
+            self.hidden_dim = self.gfb.out_dim
+        
+        self.hidden_dim = in_channels
+
         self.div = nn.Conv2d(
             self.hidden_dim,
             self.hidden_dim,
@@ -163,10 +168,10 @@ class DivNormExcInh(nn.Module):
             padding=(divnorm_fsize - 1) // 2,
             padding_mode=padding_mode,
             groups=groups,
-            bias=False)
+            bias=True)
         self.e_e = nn.Conv2d(
             self.hidden_dim, self.hidden_dim, 
-            exc_fsize, bias=False, padding=(exc_fsize - 1) // 2,
+            exc_fsize, bias=True, padding=(exc_fsize - 1) // 2,
             )
         # self.i_ff = nn.Conv2d(
         #     self.in_channels, self.hidden_dim, inh_fsize, 
@@ -175,15 +180,16 @@ class DivNormExcInh(nn.Module):
         self.i_e = nn.Conv2d(
             self.hidden_dim, self.hidden_dim, inh_fsize, 
             padding=(inh_fsize - 1) // 2,
-            bias=False,)
+            bias=True,)
         # self.e_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1, bias=False)
         self.sigma = nn.Parameter(torch.ones([1, self.hidden_dim, 1, 1]))
-        nonnegative_weights_init(self.e_e)
-        nonnegative_weights_init(self.i_e)
+        self.output_bn = nn.BatchNorm1d(64)
+        #nonnegative_weights_init(self.e_e)
+        #nonnegative_weights_init(self.i_e)
         # nonnegative_weights_init(self.e_i)
-        nonnegative_weights_init(self.div)
+        #nonnegative_weights_init(self.div)
 
-    def forward(self, x, use_gabor=True):
+    def forward(self, x):
         """
         params:
           x: Input grayscale image tensor
@@ -191,7 +197,7 @@ class DivNormExcInh(nn.Module):
           output: Output post divisive normalization
         """
         # Gabor filter bank
-        if self.in_channels > 3:
+        if self.in_channels <= 3:
             simple_cells = F.relu(self.gfb(x))
             print("| Using Gabor Filter Bank |")
         else:
@@ -205,7 +211,7 @@ class DivNormExcInh(nn.Module):
         # Excitatory lateral connections (Center corresponds to self-excitation)
         excitation = self.e_e(simple_cells)
         simple_cells = simple_cells + excitation  - inhibition
-        simple_cells = F.relu(simple_cells)
+        simple_cells = F.relu(self.output_bn(simple_cells))
         #output = {'out': simple_cells,
         #          'norm': norm
         #          }

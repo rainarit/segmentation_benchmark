@@ -5,6 +5,8 @@ from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
 from .divisive_norm_exc_inh import *
 
+from tqdm import tqdm
+
 __all__ = ['ResNet_DivNorm', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
            'wide_resnet50_2', 'wide_resnet101_2']
@@ -174,7 +176,7 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div = DivNormExcInh(1, [15, 21], [0, 45, 90, 135], [2, 3], [0, 90, 180, 270], 7)
+        self.div = DivNormExcInh(64, None, None, None, None, 7)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -187,6 +189,8 @@ class ResNet_DivNorm(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        self.calls = 2
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -254,6 +258,7 @@ class ResNet_DivNorm(nn.Module):
         x = self.fc(x)
 
         return return_dict
+        #return x
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
