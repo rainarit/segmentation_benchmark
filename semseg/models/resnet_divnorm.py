@@ -234,7 +234,7 @@ class ResNet_DivNorm(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor, use_bn1=False) -> Tensor:
+    def _forward_impl(self, x: Tensor, use_bn1=True) -> Tensor:
         # See note [TorchScript super()]
         return_dict = {}
         x = self.conv1(x)
@@ -257,8 +257,8 @@ class ResNet_DivNorm(nn.Module):
         x = torch.flatten(x, 1)
         x = self.fc(x)
 
-        return return_dict
-        #return x
+        #return return_dict
+        return x
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)

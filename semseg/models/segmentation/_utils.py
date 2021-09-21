@@ -2,7 +2,6 @@ from collections import OrderedDict
 
 from torch import nn
 from torch.nn import functional as F
-import ipdb
 
 
 class _SimpleSegmentationModel(nn.Module):

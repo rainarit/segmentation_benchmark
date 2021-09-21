@@ -183,7 +183,7 @@ class DivNormExcInh(nn.Module):
             bias=True,)
         # self.e_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1, bias=False)
         self.sigma = nn.Parameter(torch.ones([1, self.hidden_dim, 1, 1]))
-        self.output_bn = nn.BatchNorm1d(64)
+        self.output_bn = nn.BatchNorm2d(64)
         #nonnegative_weights_init(self.e_e)
         #nonnegative_weights_init(self.i_e)
         # nonnegative_weights_init(self.e_i)

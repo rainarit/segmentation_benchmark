@@ -18,11 +18,9 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
-
 from torch.utils.tensorboard import SummaryWriter
-
-import models.resnet_divnorm as models_resnet_divnorm
-import utils
+import models.resnet_divnorm
+import  csv
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -31,14 +29,17 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
+                    help='model architecture: ' +
+                        ' | '.join(model_names) +
+                        ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=1024, type=int,
+parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
@@ -80,8 +81,8 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 best_acc1 = 0
 
 
-def main():
-    args = parser.parse_args()
+def main(args):
+    writer = SummaryWriter(str(args.tensorboard_dir))
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -109,18 +110,13 @@ def main():
         args.world_size = ngpus_per_node * args.world_size
         # Use torch.multiprocessing.spawn to launch distributed processes: the
         # main_worker process function
-        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
+        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(writer, ngpus_per_node, args))
     else:
         # Simply call main_worker function
-        main_worker(args.gpu, ngpus_per_node, args)
+        main_worker(writer, args.gpu, ngpus_per_node, args)
 
 
-def main_worker(gpu, ngpus_per_node, args):
-
-    writer = SummaryWriter(str(args.tensorboard_dir))
-
-    iterator = utils.Iterator()
-
+def main_worker(writer, gpu, ngpus_per_node, args):
     global best_acc1
     args.gpu = gpu
 
@@ -141,14 +137,14 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> using pre-trained model '{}'".format(args.arch))
         if "divnorm" in str(args.arch):
             model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=True)
+            model = models.resnet_divnorm.__dict__[model_name](pretrained=True)
         else:
             model = models.__dict__[args.arch](pretrained=True)
     else:
         print("=> creating model '{}'".format(args.arch))
         if "divnorm" in str(args.arch):
             model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=False)
+            model = models.resnet_divnorm.__dict__[model_name](pretrained=False)
         else:
             model = models.__dict__[args.arch](pretrained=False)
 
@@ -167,6 +163,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.batch_size = int(args.batch_size / ngpus_per_node)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+            print(333333)
         else:
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
@@ -249,7 +246,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args, writer, iterator)
+        validate(val_loader, model, criterion, writer, args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -258,19 +255,17 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator)
+        train(train_loader, model, criterion, optimizer, epoch, writer, args)
 
         # evaluate on validation set
-        acc1, acc5 = validate(val_loader, model, criterion, args, iterator)
+        acc1 = validate(val_loader, model, criterion, writer, args)
 
-        writer.add_scalar("Val/Acc1", acc1, epoch)
-        writer.add_scalar("Val/Acc5", acc5, epoch)
+        writer.add_scalar("Acc1/val", acc1, epoch)
+        writer.flush()
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
-
-        writer.add_scalar("Val/Best_Acc1", best_acc1, epoch)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -282,10 +277,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer' : optimizer.state_dict(),
             }, is_best)
 
-        
 
-
-def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator):
+def train(train_loader, model, criterion, optimizer, epoch, writer, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -300,10 +293,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
     model.train()
 
     end = time.time()
-
-    # Creates once at the beginning of training
-    scaler = torch.cuda.amp.GradScaler()
-
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -315,10 +304,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
 
         # compute output
         output = model(images)
-
-        # Casts operations to mixed precision
-        with torch.cuda.amp.autocast():
-            loss = criterion(output, target)
+        loss = criterion(output, target)
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -326,21 +312,16 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
+        writer.add_scalar("Acc1/train", acc1[0], i)
+        writer.add_scalar("Acc5/train", acc5[0], i)
+        writer.add_scalar("Loss/train", loss.item(), i)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], i)
+
+
         # compute gradient and do SGD step
         optimizer.zero_grad()
-
-        # Casts operations to mixed precision
-        with torch.cuda.amp.autocast():
-            scaler.scale(loss).backward()
-            #loss.backward()
-
-        # Unscales gradients and calls
-        # or skips optimizer.step()
-        scaler.step(optimizer)
-        #optimizer.step()
-
-        # Updates the scale for next iteration
-        scaler.update()
+        loss.backward()
+        optimizer.step()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -349,14 +330,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         if i % args.print_freq == 0:
             progress.display(i)
 
-        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
-        writer.flush()
 
-        iterator.add_train()
-
-
-def validate(val_loader, model, criterion, args, iterator):
+def validate(val_loader, model, criterion, writer, args):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -371,10 +346,6 @@ def validate(val_loader, model, criterion, args, iterator):
 
     with torch.no_grad():
         end = time.time()
-
-        # Creates once at the beginning of training
-        scaler = torch.cuda.amp.GradScaler()
-
         for i, (images, target) in enumerate(val_loader):
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
@@ -383,19 +354,13 @@ def validate(val_loader, model, criterion, args, iterator):
 
             # compute output
             output = model(images)
-
-            # Casts operations to mixed precision
-            with torch.cuda.amp.autocast():
-                loss = criterion(output, target)
+            loss = criterion(output, target)
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
             losses.update(loss.item(), images.size(0))
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
-
-            # Updates the scale for next iteration
-            scaler.update()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -408,7 +373,7 @@ def validate(val_loader, model, criterion, args, iterator):
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
-    return top1.avg, top5.avg
+    return top1.avg
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
@@ -483,4 +448,5 @@ def accuracy(output, target, topk=(1,)):
 
 
 if __name__ == '__main__':
-    main()
+    args = parser.parse_args()
+    main(args)
