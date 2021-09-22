@@ -110,6 +110,7 @@ def main():
         # Use torch.multiprocessing.spawn to launch distributed processes: the
         # main_worker process function
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
+        
     else:
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
@@ -313,12 +314,13 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         if torch.cuda.is_available():
             target = target.cuda(args.gpu, non_blocking=True)
 
-        # compute output
-        output = model(images)
-
         # Casts operations to mixed precision
+        optimizer.zero_grad()
         with torch.cuda.amp.autocast():
+            output = model(images)
             loss = criterion(output, target)
+            if torch.isnan(loss):
+                print(output.min(), output.max(), target.min(), target.max(), loss)
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -326,20 +328,16 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-
         # Casts operations to mixed precision
-        with torch.cuda.amp.autocast():
-            scaler.scale(loss).backward()
-            #loss.backward()
-
-        # Unscales gradients and calls
-        # or skips optimizer.step()
+        scaler.scale(loss).backward()
         scaler.step(optimizer)
-        #optimizer.step()
+        # if args.rank == 0:
+        #     # Clamping parameters of divnorm to non-negative values
+        #     for p in model.module.backbone.div.parameters():
+        #         if 'conv' in p:
+        #             import ipdb; ipdb.set_trace()
+        #             p.clamp(min=0.)
 
-        # Updates the scale for next iteration
         scaler.update()
 
         # measure elapsed time
@@ -347,7 +345,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         end = time.time()
 
         if i % args.print_freq == 0:
-            progress.display(i)
+            if args.rank == 0:
+                progress.display(i)
 
         writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
@@ -381,11 +380,10 @@ def validate(val_loader, model, criterion, args, iterator):
             if torch.cuda.is_available():
                 target = target.cuda(args.gpu, non_blocking=True)
 
-            # compute output
-            output = model(images)
 
             # Casts operations to mixed precision
             with torch.cuda.amp.autocast():
+                output = model(images)
                 loss = criterion(output, target)
 
             # measure accuracy and record loss
