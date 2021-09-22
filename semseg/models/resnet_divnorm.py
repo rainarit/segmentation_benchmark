@@ -154,13 +154,14 @@ class ResNet_DivNorm(nn.Module):
         groups: int = 1,
         width_per_group: int = 64,
         replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        residual_divnorm: bool = True,
     ) -> None:
         super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.residual_divnorm = residual_divnorm
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -238,12 +239,10 @@ class ResNet_DivNorm(nn.Module):
         # See note [TorchScript super()]
         return_dict = {}
         x = self.conv1(x)
-        x = self.div(x)
-
-        if use_bn1:
-            x = self.bn1(x)
-
+        x = self.bn1(x)
         x = self.relu(x)
+        # Adding divnorm to the final output of conv1
+        x = self.div(x, residual=self.residual_divnorm)
         x = self.maxpool(x)
 
         x = self.layer1(x)
@@ -256,8 +255,6 @@ class ResNet_DivNorm(nn.Module):
         x = self.avgpool(x_layer4)
         x = torch.flatten(x, 1)
         x = self.fc(x)
-
-        #return return_dict
         return x
 
     def forward(self, x: Tensor) -> Tensor:
