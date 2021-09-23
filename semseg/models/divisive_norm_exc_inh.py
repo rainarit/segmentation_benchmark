@@ -204,7 +204,6 @@ class DivNormExcInh(nn.Module):
             simple_cells = nn.Identity()(x)
         # # Divisive normalization, inspired by Schwartz and Simoncelli 2001
         norm = 1 + F.relu(self.div(simple_cells)) 
-        # \ + self.sigma**2 , div already contains bias
         simple_cells = simple_cells / norm
         # Inhibitory cells (subtractive)
         inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
