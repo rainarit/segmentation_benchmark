@@ -4,6 +4,7 @@ import random
 import shutil
 import time
 import warnings
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -23,6 +24,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 import models.resnet_divnorm as models_resnet_divnorm
 import utils
+
+random.seed(0)
+np.random.seed(0)
+torch.manual_seed(0)
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -259,29 +264,27 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator)
-
-        # evaluate on validation set
-        acc1, acc5 = validate(val_loader, model, criterion, args, iterator)
-
-        writer.add_scalar("Val/Acc1", acc1, epoch)
-        writer.add_scalar("Val/Acc5", acc5, epoch)
+        acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
-        writer.add_scalar("Val/Best_Acc1", best_acc1, epoch)
-
-        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'best_acc1': best_acc1,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best)
+        writer.add_scalar("Train/Best_Acc1", best_acc1, epoch)
+        state = {
+                    'epoch': epoch + 1,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'best_acc1_train': best_acc1,
+                    'optimizer' : optimizer.state_dict(),
+                }
+        if epoch > (args.epochs - 10):
+            # store only last ten epoch weights
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                    and args.rank % ngpus_per_node == 0):
+                save_checkpoint(state, is_best)
+        else:
+            torch.save(state, "checkpoint_%s.pth" % args.arch)
 
         
 
@@ -328,17 +331,16 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
-        # Casts operations to mixed precision
         scaler.scale(loss).backward()
         scaler.step(optimizer)
+        scaler.update()
+        
         # if args.rank == 0:
         #     # Clamping parameters of divnorm to non-negative values
         #     for p in model.module.backbone.div.parameters():
         #         if 'conv' in p:
         #             import ipdb; ipdb.set_trace()
         #             p.clamp(min=0.)
-
-        scaler.update()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -353,6 +355,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         writer.flush()
 
         iterator.add_train()
+    return top1.avg
 
 
 def validate(val_loader, model, criterion, args, iterator):
