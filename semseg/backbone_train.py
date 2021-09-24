@@ -282,9 +282,9 @@ def main_worker(gpu, ngpus_per_node, args):
             # store only last ten epoch weights
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                     and args.rank % ngpus_per_node == 0):
-                save_checkpoint(state, is_best)
+                save_checkpoint(state, is_best, "checkpoint_%s_epoch_%s.pth.tar" % (args.arch, epoch))
         else:
-            torch.save(state, "checkpoint_%s.pth" % args.arch)
+            save_checkpoint(state, is_best, "checkpoint_%s.pth.tar" % args.arch)
 
         
 def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator):
