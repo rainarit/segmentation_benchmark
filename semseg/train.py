@@ -11,6 +11,7 @@ from PIL import Image
 import matplotlib.image as mpimg
 from tqdm import tqdm
 from coco_utils import get_coco
+from voc_utils import get_sbd
 import presets
 import utils
 import os
@@ -43,6 +44,7 @@ def get_dataset(dir_path, name, image_set, transform):
     paths = {
         "coco": (dir_path, get_coco, 21), 
         "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
+        "sbd": (dir_path, torchvision.datasets.VOCSegmentation, 21),
     }
     p, ds_fn, num_classes = paths[name]
     if name == "voc":
@@ -75,20 +77,6 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def distributed_eval(idx, image, target, model, device, confmat, data_loader, iterator):
-    image, target = image.to(device), target.to(device)
-    output = model(image)
-    output = output['out']
-    confmat.update(target.flatten(), output.argmax(1).flatten())
-    ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-    writer.add_image('Images/ground_image', ground_truth, iterator.eval_step, dataformats='HWC')
-    writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-    writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-    writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-    
-    writer.flush()
-    iterator.add_eval()
-
 def evaluate(model, data_loader, device, num_classes, iterator):
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
@@ -96,6 +84,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     header = 'Test:'
 
     with torch.no_grad():
+        start_time = time.time()
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
             image, target = image.to(device), target.to(device)
             output = model(image)
@@ -115,6 +104,10 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             iterator.add_eval()
 
         confmat.reduce_from_all_processes()
+
+        total_time = time.time() - start_time
+        total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+        print('Validation time {}'.format(total_time_str))
     return confmat
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, iterator):
@@ -183,8 +176,8 @@ def main(args):
 
     device = torch.device(args.device)
 
-    mean_iou = list()
-    checkpoints = list()
+    mean_iou_list = list()
+    checkpoints_list = list()
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
@@ -218,10 +211,6 @@ def main(args):
                       num_classes=num_classes, 
                       aux_loss=args.aux_loss)
     
-    #model = torchvision.models.segmentation.__dict__['deeplabv3_resnet101'](num_classes=num_classes,
-    #                                                             aux_loss=args.aux_loss,
-    #                                                             pretrained=args.pretrained)
-    
     model.to(device)
 
     if args.distributed:
@@ -237,8 +226,6 @@ def main(args):
         {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
         {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
     ]
-
-    
 
     if args.aux_loss:
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
@@ -270,7 +257,7 @@ def main(args):
         confmat_iu = confmat.get_IoU()
         confmat_acc_global = confmat.get_acc_global_correct()
 
-        mean_iou.append(confmat_iu)
+        mean_iou_list.append(confmat_iu)
 
         writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
         writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
@@ -283,17 +270,18 @@ def main(args):
             'epoch': epoch,
             'args': args
         }
-        checkpoints.append(checkpoint)
+        checkpoints_list.append(checkpoint)
 
     iou_file = str(args.model) + str(args.backbone) + ".csv"
     with open(iou_file,"w") as f:
         wr = csv.writer(f,delimiter="\n")
-        wr.writerow(mean_iou)
+        wr.writerow(mean_iou_list)
 
-    max_iou_index = mean_iou.index(max(mean_iou))
-    utils.save_on_master(
-        checkpoints[max_iou_index],
-        os.path.join(args.output_dir, 'checkpoint.pth'))
+    max_iou_index = mean_iou_list.index(max(mean_iou_list))
+    for i in range(len(checkpoints_list)):
+        utils.save_on_master(checkpoints_list[i], os.path.join(args.output_dir, 'checkpoint_{}.pth'.format(i)))
+        if i == max_iou_index:
+            utils.save_on_master(checkpoints_list[i], os.path.join(args.output_dir, 'best_checkpoint.pth'))
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
