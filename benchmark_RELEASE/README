@@ -1,0 +1,110 @@
+This README describes the dataset and associated benchmark. The dataset was first described in [1]. The benchmark is virtually identical to the BSDS benchmark [2].
+
+If you use this dataset and benchmark, please cite:
+@InProceedings{BharathICCV2011,
+  author       = "Bharath Hariharan and Pablo Arbelaez and Lubomir Bourdev and Subhransu Maji and Jitendra Malik",
+  title        = "Semantic Contours from Inverse Detectors",
+  booktitle    = "International Conference on Computer Vision (ICCV)",
+  year         = "2011",
+}
+
+
+
+=======
+Dataset
+=======
+
+The dataset is bundled together in the directory 'dataset'. There are three subdirectories:
+	o img
+	This directory contains all the images
+	
+	o cls
+	This directory contains category-specific segmentations and boundaries. There is one .mat file for
+	each image. Each mat file contains a struct called GTcls with 3 fields:
+		- GTcls.Segmentation is a single 2D image containing the segmentation. Pixels that belong to 
+		category k have value k, pixels that do not belong to any category have value 0.
+		- GTcls.Boundaries is a cell array. GTcls.Boundaries{k} contains the boundaries of the k-th category.
+		These have been stored as sparse arrays to conserve space, so make sure you convert them to full arrays
+		when you want to use them/visualize them, eg : full(GTcls.Boundaries{15})
+		- GTcls.CategoriesPresent is a list of the categories that are present.
+	
+	o inst
+	This directory contains instance-specific segmentations and boundaries. There is one mat file for each
+	image. Each mat file contains a struct called GTinst with 3 fields:
+		- GTinst.Segmentation is a single 2D image containing the segmentation. Pixels belonging to the
+		i-th instance have value i.
+		- GTinst.Boundaries is a cell array. GTinst.Boundaries{i} contains the boundaries of the i-th instance.
+		Again, these are sparse arrays.
+		- GTinst.Categories is a vector with as many components as there are instances. GTinst.Categories(i) is
+		the category label of the i-th instance.
+	
+There are in addition two text files, train.txt and val.txt, containing the names (without the extension) of the 
+train images and validation images respectively. (They are called val here instead of test to avoid confusion with 
+PASCAL VOC's test images: all images have been drawn from VOC2011 Train/Val).
+
+
+============
+Installation
+============
+
+Most of the code is just MATLAB files and consequently doesn't need any installation. However the code for computing correspondence
+ between pixels is mex code that requires compilation. You can do this by cd-ing into the benchmark_code_RELEASE directory and run:
+
+addpath(genpath(pwd))
+build
+
+Note that to run the benchmark you will need the entire subtree below benchmark_code_RELEASE in your MATLAB path.
+
+To make sure no errors occured, run run_demo. This should give you a plot that is identical to demo_plot.jpg, together with the following
+values for the maximal F-measure and AP:
+
+ODS: F( 0.700, 0.594 ) = 0.643   [th = 0.47]
+OIS: F( 0.654, 0.683 ) = 0.668
+Area_PR = 0.680
+
+Note that ODS denotes the "Optimal dataset scale" and is the number reported for maxF measure in the paper.
+=========
+Benchmark
+=========
+
+Code for the benchmark is in the directory benchmark_code_RELEASE. The benchmark is currently only for category-specific
+ boundaries. To evaluate the benchmark for a particular category, you need to save your results for that category in a 
+separate directory as pngs or bmps. You will also need to modify the paths specified in config.m to point to your local
+ paths. 
+
+Once you have done this, you can run the benchmark by running
+
+benchmark_category(input_dir, categ_num, output_dir)
+
+input_dir is the name of the directory containing your output images. categ_num is the number of the category you want 
+to benchmark. (Look in category_names.m for a list of the category names and the corresponding number) output_dir is 
+the name of the directory in which you want the results of the benchmark to be saved. This should produce a plot.
+
+Note that the benchmark might take a long time on a single machine. If you have a cluster or cloud computing resources, you might
+consider parallelizing the benchmark. This should be easy: the benchmark consists of two steps: evaluate_bmps and collect_eval_bdry. 
+The former can be completely parallelized, while the latter is sequential.  
+
+==================
+Results from paper
+==================
+The result images for the algorithm proposed in [1] are also available in a directory called paper_results. paper_results/<category number> contains bmps 
+for the val set. paper_results/<category number>/res contains the benchmark results for that particular category. Run
+
+plot_eval(paper_results/<category number>/res)
+
+ to plot the curves.
+
+IMPORTANT NOTE: This version of the dataset is more accurate and more complete than the one we used in [1]. As such the curves and numbers
+will be slightly different. The average maximum F measure is 27.9% instead of 28%.
+
+
+
+==========
+References
+==========
+1. Bharath Hariharan, Pablo Arbelaez, Lubomir Bourdev, Subhransu Maji and Jitendra Malik. Semantic contours from inverse detectors. In International Conference on Computer Vision, 2011. 
+2. The Berkeley Segmentation Dataset and Benchmark. http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html
+
+
+
+

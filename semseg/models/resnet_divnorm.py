@@ -15,7 +15,7 @@ __all__ = ['ResNet_DivNorm', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-f37072fd.pth',
     'resnet34': 'https://download.pytorch.org/models/resnet34-b627a593.pth',
-    'resnet50': 'https://download.pytorch.org/models/resnet50-0676ba61.pth',
+    'resnet50': '/mnt/cube/projects/imagenet_checkpoints/rraina/checkpoint.pth.tar',
     'resnet101': 'https://download.pytorch.org/models/resnet101-63fe2227.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-394f9c45.pth',
     'resnext50_32x4d': 'https://download.pytorch.org/models/resnext50_32x4d-7cdf4587.pth',
@@ -154,13 +154,14 @@ class ResNet_DivNorm(nn.Module):
         groups: int = 1,
         width_per_group: int = 64,
         replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        residual_divnorm: bool = True,
     ) -> None:
         super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.residual_divnorm = residual_divnorm
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -238,12 +239,10 @@ class ResNet_DivNorm(nn.Module):
         # See note [TorchScript super()]
         return_dict = {}
         x = self.conv1(x)
-        x = self.div(x)
-
-        if use_bn1:
-            x = self.bn1(x)
-
+        x = self.bn1(x)
         x = self.relu(x)
+        # Adding divnorm to the final output of conv1
+        x = self.div(x, residual=self.residual_divnorm)
         x = self.maxpool(x)
 
         x = self.layer1(x)
@@ -256,9 +255,8 @@ class ResNet_DivNorm(nn.Module):
         x = self.avgpool(x_layer4)
         x = torch.flatten(x, 1)
         x = self.fc(x)
-
-        #return return_dict
-        return x
+        #return x
+        return return_dict
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
@@ -274,10 +272,10 @@ def _resnet(
 ) -> ResNet_DivNorm:
     model = ResNet_DivNorm(block, layers, **kwargs)
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls[arch],
-                                              progress=progress)
+        #state_dict = load_state_dict_from_url(model_urls[arch],
+        #                                      progress=progress)
         #model.load_state_dict(state_dict)
-        model.load_state_dict(state_dict, strict=False)
+        model.load_state_dict(torch.load(model_urls[arch]), strict=False)
     return model
 
 

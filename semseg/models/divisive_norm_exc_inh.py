@@ -58,20 +58,18 @@ def nonnegative_weights_init(m):
     if isinstance(m, nn.Conv2d):
         m.weight.data.uniform_(0, 1)
         m.weight.data.clamp_(0)
-        if m.bias is not None:
-            raise ValueError("Convolution should not contain bias")
+        m.bias.data.fill_(0.)
     else:
-        m.data.zero_()
+        m.data.fill_(0.)
         
 def orthogonal_weights_init(m):
     """Orthogonal initialization of weights."""
     if isinstance(m, nn.Conv2d):
         nn.init.orthogonal_(m.weight)  #.data.uniform_(0, 1)
         m.weight.data.clamp_(0)
-        if m.bias is not None:
-            raise ValueError("Convolution should not contain bias")
+        m.bias.data.fill_(0.)
     else:
-        m.data.zero_()
+        m.data.fill_(0.)
 
 class GaborFilterBank(nn.Module):
     """Implements linear filtering using a Gabor Filter Bank."""
@@ -180,40 +178,39 @@ class DivNormExcInh(nn.Module):
         self.i_e = nn.Conv2d(
             self.hidden_dim, self.hidden_dim, inh_fsize, 
             padding=(inh_fsize - 1) // 2,
-            bias=True,)
+            bias=True)
         # self.e_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1, bias=False)
-        self.sigma = nn.Parameter(torch.ones([1, self.hidden_dim, 1, 1]))
+        # self.sigma = nn.Parameter(torch.zeros([1, self.hidden_dim, 1, 1]))
         self.output_bn = nn.BatchNorm2d(64)
-        #nonnegative_weights_init(self.e_e)
-        #nonnegative_weights_init(self.i_e)
+        self.output_relu = nn.ReLU(inplace=True)
+        # nonnegative_weights_init(self.e_e)
+        # nonnegative_weights_init(self.i_e)
         # nonnegative_weights_init(self.e_i)
-        #nonnegative_weights_init(self.div)
+        # nonnegative_weights_init(self.div)
 
-    def forward(self, x):
+    def forward(self, x, residual=True):
         """
         params:
           x: Input grayscale image tensor
         Returns:
           output: Output post divisive normalization
         """
+        identity = x
         # Gabor filter bank
         if self.in_channels <= 3:
             simple_cells = F.relu(self.gfb(x))
             print("| Using Gabor Filter Bank |")
         else:
             simple_cells = nn.Identity()(x)
-        # # Divisive normalization, Schwartz and Simoncelli 2001
-        simple_cells = torch.pow(simple_cells, 2)
-        norm = self.div(simple_cells) + self.sigma**2 + torch.tensor(1e-8)
+        # # Divisive normalization, inspired by Schwartz and Simoncelli 2001
+        norm = 1 + F.relu(self.div(simple_cells)) 
         simple_cells = simple_cells / norm
         # Inhibitory cells (subtractive)
         inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
         # Excitatory lateral connections (Center corresponds to self-excitation)
         excitation = self.e_e(simple_cells)
-        simple_cells = simple_cells + excitation  - inhibition
-        simple_cells = F.relu(self.output_bn(simple_cells))
-        #output = {'out': simple_cells,
-        #          'norm': norm
-        #          }
-        output = simple_cells
+        output = self.output_bn(excitation - inhibition)
+        if residual:
+            output += identity
+        output = self.output_relu(output)
         return output

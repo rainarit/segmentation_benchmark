@@ -105,15 +105,14 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
             ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-            if args.rank==0:
-                writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
+            writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+            writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+            writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
 
-                writer.flush()
-                iterator.add_eval()
+            writer.flush()
+            iterator.add_eval()
 
         confmat.reduce_from_all_processes()
     return confmat
@@ -143,26 +142,26 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
         ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
 
-        if args.rank==0:
-            writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-            writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
-            writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-            writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-            writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
 
-            writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-            writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
+        writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
+        writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
+        writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
+        writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
+        writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
+
+        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
-        if args.rank==0:
-            writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
-            writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
-            writer.flush()
 
-            iterator.add_train()
+        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
+        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
+        writer.flush()
+
+        iterator.add_train()
 
     confmat_train.reduce_from_all_processes()
 

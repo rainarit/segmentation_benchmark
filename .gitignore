@@ -14,3 +14,14 @@
 *.mx
 *.0
 *.JPEG
+*.cc
+*.m
+*.hh
+*.mat
+*.tgz
+*.bmp
+*.fig
+*.h
+*.pdf
+.gitignore
+.gitignore
