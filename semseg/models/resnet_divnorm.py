@@ -4,8 +4,10 @@ import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
 from .divisive_norm_exc_inh import *
+torch.autograd.set_detect_anomaly(True)
 
 from tqdm import tqdm
+
 
 __all__ = ['ResNet_DivNorm', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -15,7 +17,8 @@ __all__ = ['ResNet_DivNorm', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-f37072fd.pth',
     'resnet34': 'https://download.pytorch.org/models/resnet34-b627a593.pth',
-    'resnet50': '/mnt/cube/projects/imagenet_checkpoints/rraina/checkpoint.pth.tar',
+    #'resnet50': '/mnt/cube/projects/imagenet_checkpoints/rraina/checkpoint.pth.tar',
+    'resnet50': 'https://download.pytorch.org/models/resnet50-0676ba61.pth',
     'resnet101': 'https://download.pytorch.org/models/resnet101-63fe2227.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-394f9c45.pth',
     'resnext50_32x4d': 'https://download.pytorch.org/models/resnext50_32x4d-7cdf4587.pth',
@@ -177,7 +180,10 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div = DivNormExcInh(64, None, None, None, None, 7)
+        self.div_block1 = DivNormExcInh(64, None, None, None, None, 7)
+        self.div_block2 = DivNormExcInh(256, None, None, None, None, 7)
+        self.div_block3 = DivNormExcInh(512, None, None, None, None, 7)
+        self.div_block4 = DivNormExcInh(1024, None, None, None, None, 7)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -241,18 +247,26 @@ class ResNet_DivNorm(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+
         # Adding divnorm to the final output of conv1
-        x = self.div(x, residual=self.residual_divnorm)
+        x = self.div_block1(x, residual=self.residual_divnorm)
         x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x_layer3 = self.layer3(x)
-        return_dict['aux'] = x_layer3
-        x_layer4 = self.layer4(x_layer3)
-        return_dict['out'] = x_layer4
 
-        x = self.avgpool(x_layer4)
+        x = self.layer1(x)
+        x = self.div_block2(x, residual=self.residual_divnorm)
+
+        x = self.layer2(x)
+        x = self.div_block3(x, residual=self.residual_divnorm)
+
+        x = self.layer3(x)
+        x = self.div_block4(x, residual=self.residual_divnorm)
+        return_dict['aux'] = x
+
+        x = self.layer4(x)
+        return_dict['out'] = x
+
+        x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
         #return x
@@ -272,10 +286,11 @@ def _resnet(
 ) -> ResNet_DivNorm:
     model = ResNet_DivNorm(block, layers, **kwargs)
     if pretrained:
-        #state_dict = load_state_dict_from_url(model_urls[arch],
-        #                                      progress=progress)
-        #model.load_state_dict(state_dict)
-        model.load_state_dict(torch.load(model_urls[arch]), strict=False)
+        state_dict = load_state_dict_from_url(model_urls[arch],
+                                              progress=progress)
+        model.load_state_dict(state_dict, strict=False)
+        #checkpoint = torch.load(model_urls[arch])
+        #model.load_state_dict(checkpoint['state_dict'], strict=False)
     return model
 
 

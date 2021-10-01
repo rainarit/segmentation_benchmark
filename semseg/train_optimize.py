@@ -21,10 +21,15 @@ import torch
 import torch.distributed as dist
 import matplotlib.pyplot as plt
 import math
-from torch.utils.tensorboard import SummaryWriter
+
 from models.segmentation.segmentation import _load_model
 import ipdb
 import  csv
+
+from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler
+from functools import partial
 
 seed=42
 random.seed(seed)
@@ -110,28 +115,6 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
-            if ".mat" in data_loader.dataset.masks[idx]:
-                ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-            else:
-                ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-
-            writer.flush()
-            iterator.add_eval()
-
         confmat.reduce_from_all_processes()
 
         total_time = time.time() - start_time
@@ -162,37 +145,9 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        if idx%10==0:
-            if ".mat" in data_loader.dataset.masks[idx]:
-                ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-                writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HW')
-                writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-                writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-                writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
-            else:
-                ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-                writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
-                writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-                writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-                writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
-
-        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
-
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
-
-
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
-        writer.flush()
 
         iterator.add_train()
 
@@ -203,10 +158,34 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-def main(args):
+def optimize(num_samples=10, max_num_epochs=10, gpus_per_trial=1):
+    config = {
+        "divnorm_fsize": tune.choice([2, 4, 8, 16])
+    }
+    scheduler = ASHAScheduler(
+        metric="loss",
+        mode="min",
+        max_t=max_num_epochs,
+        grace_period=1,
+        reduction_factor=2)
+    reporter = CLIReporter(
+        metric_columns=["accuracy"])
+    result = tune.run(
+        partial(train_cifar, data_dir=data_dir),
+        resources_per_trial={"gpu": gpus_per_trial},
+        config=config,
+        num_samples=num_samples,
+        scheduler=scheduler,
+        progress_reporter=reporter)
+    best_trial = result.get_best_trial("loss", "min", "last")
+    print("Best trial config: {}".format(best_trial.config))
+    print("Best trial final validation loss: {}".format(
+        best_trial.last_result["loss"]))
+    print("Best trial final validation accuracy: {}".format(
+        best_trial.last_result["accuracy"]))
+    
 
-    if args.output_dir:
-        utils.mkdir(args.output_dir)
+def main(args):
 
     utils.init_distributed_mode(args)
 
@@ -239,10 +218,6 @@ def main(args):
         dataset_test, batch_size=1,
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
-
-    #model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-    #                                                             aux_loss=args.aux_loss,
-    #                                                             pretrained=args.pretrained)
 
     model = _load_model(arch_type=args.model, 
                       backbone=args.backbone,
@@ -292,18 +267,6 @@ def main(args):
 
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
 
-        for name, param in model.named_parameters():
-            writer.add_histogram(str(name), param, epoch)
-            writer.flush()
-
-            if len(param.shape) == 4:
-                filter = param.detach().cpu()
-                img = visTensor(filter, ch=0, allkernels=False)
-                writer.add_image('Filters/'+ str(name), img, epoch, dataformats='HWC')
-                
-                
-
-
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
 
@@ -311,28 +274,6 @@ def main(args):
         confmat_acc_global = confmat.get_acc_global_correct()
 
         mean_iou_list.append(confmat_iu)
-
-        writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
-        writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
-        writer.flush()
-
-        checkpoint = {
-            'model': model_without_ddp.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'lr_scheduler': lr_scheduler.state_dict(),
-            'epoch': epoch,
-            'args': args
-        }
-        utils.save_on_master(checkpoint, os.path.join(args.output_dir, 'checkpoint_{}.pth'.format(epoch)))
-        checkpoints_list.append(checkpoint)
-
-    iou_file = str(args.model) + str(args.backbone) + ".csv"
-    with open(iou_file,"w") as f:
-        wr = csv.writer(f,delimiter="\n")
-        wr.writerow(mean_iou_list)
-
-    max_iou_index = mean_iou_list.index(max(mean_iou_list))
-    utils.save_on_master(checkpoints_list[max_iou_index], os.path.join(args.output_dir, 'best_checkpoint.pth'))
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -360,8 +301,6 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output-dir', default='./output_models', help='path where to save')
-    parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -386,5 +325,4 @@ def get_args_parser(add_help=True):
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
-    writer = SummaryWriter(str(args.tensorboard_dir))
     main(args)

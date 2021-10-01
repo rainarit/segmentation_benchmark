@@ -24,10 +24,13 @@
 
 # # DeepLabV3_ResNet50_DivNorm
 # # Train model
-export CUDA_VISIBLE_DEVICES=0,1
-pkill bench
-python3 -m torch.distributed.launch --nproc_per_node=2 --use_env train.py --lr 0.032659863 --epoch 80 --dataset voc -b 16 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark --tensorboard-dir deeplabv3_resnet_divnormresnet50 --aux-loss
-pkill bench
+#pkill bench
+#python3 -m torch.distributed.launch --nproc_per_node=2 --use_env train.py --lr 0.02 --dataset voc_aug -b 16 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --tensorboard-dir deeplabv3_resnet_divnormresnet50 --aux-loss
+#pkill bench
+
+export CUDA_VISIBLE_DEVICES=1
+python3 -m torch.distributed.launch --nproc_per_node=1 --master_port=6009 --use_env train.py --lr 0.02 --dataset voc_aug -b 32 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --aux-loss
+
 # # Evaluate Model
 # pkill bench
 # python3 -m torch.distributed.launch --nproc_per_node=1 --use_env eval.py --lr 0.02 --dataset voc --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark --aux-loss

@@ -150,6 +150,8 @@ class DivNormExcInh(nn.Module):
         super(DivNormExcInh, self).__init__()
         self.in_channels = in_channels
 
+        self.divnorm_fsize = divnorm_fsize
+
         if in_channels <= 3:
             self.gfb = GaborFilterBank(in_channels, l_filter_size,
                                        l_theta, l_sfs, l_phase, stride=stride,
@@ -162,8 +164,8 @@ class DivNormExcInh(nn.Module):
         self.div = nn.Conv2d(
             self.hidden_dim,
             self.hidden_dim,
-            divnorm_fsize,
-            padding=(divnorm_fsize - 1) // 2,
+            self.divnorm_fsize,
+            padding=(self.divnorm_fsize - 1) // 2,
             padding_mode=padding_mode,
             groups=groups,
             bias=True)
@@ -181,7 +183,7 @@ class DivNormExcInh(nn.Module):
             bias=True)
         # self.e_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1, bias=False)
         # self.sigma = nn.Parameter(torch.zeros([1, self.hidden_dim, 1, 1]))
-        self.output_bn = nn.BatchNorm2d(64)
+        self.output_bn = nn.BatchNorm2d(in_channels)
         self.output_relu = nn.ReLU(inplace=True)
         # nonnegative_weights_init(self.e_e)
         # nonnegative_weights_init(self.i_e)
@@ -209,6 +211,7 @@ class DivNormExcInh(nn.Module):
         inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
         # Excitatory lateral connections (Center corresponds to self-excitation)
         excitation = self.e_e(simple_cells)
+
         output = self.output_bn(excitation - inhibition)
         if residual:
             output += identity
