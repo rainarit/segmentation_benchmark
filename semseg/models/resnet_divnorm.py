@@ -149,20 +149,21 @@ class ResNet_DivNorm(nn.Module):
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
+        residual_divnorm: bool = True,
+        inplanes: int = 64,
         num_classes: int = 1000,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
-        residual_divnorm: bool = True,
     ) -> None:
         super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
         self.residual_divnorm = residual_divnorm
-        self.inplanes = 64
+        self.inplanes = inplanes
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -177,7 +178,7 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div = DivNormExcInh(64, None, None, None, None, 7)
+        self.div = DivNormExcInh(self.inplanes, None, None, None, None, 3)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -193,7 +194,10 @@ class ResNet_DivNorm(nn.Module):
 
         self.calls = 2
 
-        for m in self.modules():
+        for k, m in self.named_modules():
+            if k.startswith("div.div"):
+                # Don't reinitialize div.divnorm weights
+                continue
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
@@ -267,9 +271,10 @@ def _resnet(
     layers: List[int],
     pretrained: bool,
     progress: bool,
+    residual_divnorm: bool,
     **kwargs: Any
 ) -> ResNet_DivNorm:
-    model = ResNet_DivNorm(block, layers, **kwargs)
+    model = ResNet_DivNorm(block, layers, residual_divnorm=residual_divnorm, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -300,7 +305,7 @@ def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet50(pretrained: bool = False, progress: bool = True, residual_divnorm=True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -308,7 +313,7 @@ def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
-                   **kwargs)
+                    residual_divnorm, **kwargs)
 
 
 def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:

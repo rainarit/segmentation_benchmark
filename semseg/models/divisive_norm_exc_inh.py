@@ -53,19 +53,18 @@ def generate_gabor_filter_weights(sz, l_theta, l_sfs,
         return gabor_bank, theta2filter
     return gabor_bank
 
+
 def nonnegative_weights_init(m):
     """Non-negative initialization of weights."""
     if isinstance(m, nn.Conv2d):
-        m.weight.data.uniform_(0, 1)
-        m.weight.data.clamp_(0)
-        m.bias.data.fill_(0.)
+        nn.init.uniform_(m.weight)
     else:
         m.data.fill_(0.)
         
 def orthogonal_weights_init(m):
     """Orthogonal initialization of weights."""
     if isinstance(m, nn.Conv2d):
-        nn.init.orthogonal_(m.weight)  #.data.uniform_(0, 1)
+        nn.init.orthogonal_(m.weight)
         m.weight.data.clamp_(0)
         m.bias.data.fill_(0.)
     else:
@@ -146,10 +145,11 @@ class DivNormExcInh(nn.Module):
                  padding_mode='zeros',
                  groups=1,
                  device='cuda',
+                 alexnet_lrn=False,
                  ):
         super(DivNormExcInh, self).__init__()
         self.in_channels = in_channels
-
+        self.alexnet_lrn = alexnet_lrn
         if in_channels <= 3:
             self.gfb = GaborFilterBank(in_channels, l_filter_size,
                                        l_theta, l_sfs, l_phase, stride=stride,
@@ -157,38 +157,44 @@ class DivNormExcInh(nn.Module):
                                        contrast=1.).to(device)
             self.hidden_dim = self.gfb.out_dim
         
-        self.hidden_dim = in_channels
+        if self.alexnet_lrn is False:
+            self.hidden_dim = in_channels
 
-        self.div = nn.Conv2d(
-            self.hidden_dim,
-            self.hidden_dim,
-            divnorm_fsize,
-            padding=(divnorm_fsize - 1) // 2,
-            padding_mode=padding_mode,
-            groups=groups,
-            bias=True)
-        self.e_e = nn.Conv2d(
-            self.hidden_dim, self.hidden_dim, 
-            exc_fsize, bias=True, padding=(exc_fsize - 1) // 2,
-            )
-        # self.i_ff = nn.Conv2d(
-        #     self.in_channels, self.hidden_dim, inh_fsize, 
-        #     padding=(inh_fsize - 1) // 2, stride=stride,
-        #     bias=False,)
-        self.i_e = nn.Conv2d(
-            self.hidden_dim, self.hidden_dim, inh_fsize, 
-            padding=(inh_fsize - 1) // 2,
-            bias=True)
-        # self.e_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1, bias=False)
-        # self.sigma = nn.Parameter(torch.zeros([1, self.hidden_dim, 1, 1]))
-        self.output_bn = nn.BatchNorm2d(64)
-        self.output_relu = nn.ReLU(inplace=True)
-        # nonnegative_weights_init(self.e_e)
-        # nonnegative_weights_init(self.i_e)
-        # nonnegative_weights_init(self.e_i)
-        # nonnegative_weights_init(self.div)
-
-    def forward(self, x, residual=True):
+            self.div = nn.Conv2d(
+                self.hidden_dim,
+                self.hidden_dim,
+                divnorm_fsize,
+                padding=(divnorm_fsize - 1) // 2,
+                padding_mode=padding_mode,
+                groups=self.hidden_dim,
+                bias=False)
+            nonnegative_weights_init(self.div)
+            self.e_e = nn.Conv2d(
+                self.hidden_dim, self.hidden_dim, 
+                exc_fsize, bias=True, padding=(exc_fsize - 1) // 2,
+                )
+            self.i_e = nn.Conv2d(
+                self.hidden_dim, self.hidden_dim, inh_fsize, 
+                padding=(inh_fsize - 1) // 2,
+                bias=True)
+            self.sigma = nn.Parameter(torch.zeros([1, self.hidden_dim, 1, 1]))
+            self.output_bn = nn.BatchNorm2d(in_channels)
+            self.output_relu = nn.ReLU(inplace=True)
+    
+    def forward(self, x, residual=False, square_act=True):
+        """
+        params:
+            x: Input activation tensor
+        returns:
+            output: Output post normalization
+        """
+        if self.alexnet_lrn:
+            del residual, square_act
+            return self.forward_alexnet_lrn(x)
+        else:
+            return self.forward_divnormei(x, residual, square_act)
+        
+    def forward_divnormei(self, x, residual=False, square_act=True, hor_conn=True):
         """
         params:
           x: Input grayscale image tensor
@@ -202,15 +208,34 @@ class DivNormExcInh(nn.Module):
             print("| Using Gabor Filter Bank |")
         else:
             simple_cells = nn.Identity()(x)
-        # # Divisive normalization, inspired by Schwartz and Simoncelli 2001
-        norm = 1 + F.relu(self.div(simple_cells)) 
-        simple_cells = simple_cells / norm
+        if square_act:
+            simple_cells = simple_cells ** 2
+            norm = self.div(simple_cells) + self.sigma ** 2 + 1e-5
+            simple_cells = simple_cells / norm
+            simple_cells = simple_cells ** 0.5
+        else:
+            norm = 1 + F.relu(self.div(simple_cells))
+            simple_cells = simple_cells / norm
         # Inhibitory cells (subtractive)
-        inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
-        # Excitatory lateral connections (Center corresponds to self-excitation)
-        excitation = self.e_e(simple_cells)
-        output = self.output_bn(excitation - inhibition)
+        if hor_conn:
+            inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
+            # Excitatory lateral connections (Center corresponds to self-excitation)
+            excitation = self.e_e(simple_cells)
+            output = self.output_bn(simple_cells + excitation - inhibition)
+        else:
+            output = self.output_bn(simple_cells)
         if residual:
             output += identity
         output = self.output_relu(output)
         return output
+
+    
+    def forward_lrn_alexnet(self, a):
+        """
+        params:
+            a: Input activation (or image) tensor
+        Returns:
+            output: Output post local response normalization 
+            as described in https://proceedings.neurips.cc/paper/2012/file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf
+        """
+        pass

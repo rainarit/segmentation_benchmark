@@ -25,9 +25,9 @@ from torch.utils.tensorboard import SummaryWriter
 import models.resnet_divnorm as models_resnet_divnorm
 import utils
 
-random.seed(0)
-np.random.seed(0)
-torch.manual_seed(0)
+# random.seed(0)
+# np.random.seed(0)
+# torch.manual_seed(0)
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -75,6 +75,8 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
+parser.add_argument('--inplanes', default=64, type=int,
+                    help='Number of inplanes (conv1 - ResNet)')
 parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
@@ -147,16 +149,16 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> using pre-trained model '{}'".format(args.arch))
         if "divnorm" in str(args.arch):
             model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=True)
+            model = models_resnet_divnorm.__dict__[model_name](pretrained=True, residual_divnorm=False, inplanes=args.inplanes)
         else:
-            model = models.__dict__[args.arch](pretrained=True)
+            model = models.__dict__[args.arch](pretrained=True, inplanes=args.inplanes)
     else:
         print("=> creating model '{}'".format(args.arch))
         if "divnorm" in str(args.arch):
             model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=False)
+            model = models_resnet_divnorm.__dict__[model_name](pretrained=False, residual_divnorm=False, inplanes=args.inplanes)
         else:
-            model = models.__dict__[args.arch](pretrained=False)
+            model = models.__dict__[args.arch](pretrained=False, inplanes=args.inplanes)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -282,9 +284,15 @@ def main_worker(gpu, ngpus_per_node, args):
             # store only last ten epoch weights
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                     and args.rank % ngpus_per_node == 0):
-                save_checkpoint(state, is_best, "checkpoint_%s_epoch_%s.pth.tar" % (args.arch, epoch))
+                state = dict(epoch=epoch + 1, model=model.state_dict(),
+                         optimizer=optimizer.state_dict())
+                torch.save(state, "checkpoint_%s_epoch_%s.pth" % (str(args.arch), epoch))
         else:
-            save_checkpoint(state, is_best, "checkpoint_%s.pth.tar" % args.arch)
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                    and args.rank % ngpus_per_node == 0):
+                state = dict(epoch=epoch + 1, model=model.state_dict(),
+                            optimizer=optimizer.state_dict())
+                torch.save(state, 'checkpoint_%s.pth' % (str(args.arch)))
 
         
 def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator):
@@ -333,12 +341,11 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         scaler.step(optimizer)
         scaler.update()
         
-        # if args.rank == 0:
-        #     # Clamping parameters of divnorm to non-negative values
-        #     for p in model.module.backbone.div.parameters():
-        #         if 'conv' in p:
-        #             import ipdb; ipdb.set_trace()
-        #             p.clamp(min=0.)
+        if args.rank == 0:
+            # Clamping parameters of divnorm to non-negative values
+            div_conv_weight = model.module.div.div.weight.data
+            div_conv_weight = div_conv_weight.clamp(min=0.)
+            model.module.div.div.weight.data = div_conv_weight
 
         # measure elapsed time
         batch_time.update(time.time() - end)
