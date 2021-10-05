@@ -310,9 +310,11 @@ def get_args_parser(add_help=True):
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
 
+    torch.autograd.set_detect_anomaly(True)
 
     config = {
-    "divnorm_fsize": tune.grid_search([7, 11, 15]),
+    "divnorm_fsize": tune.grid_search([5, 7]),
+    #"divnorm_fsize": 5,
     "args": args,
     }
 
@@ -320,9 +322,11 @@ if __name__ == "__main__":
         main,
         name="experiment",
         
-        resources_per_trial={"cpu": 0, "gpu": 2},
+        resources_per_trial={"cpu": 0, "gpu": 1},
         config=config,
         num_samples=1)
 
     print("Best config is:", analysis.get_best_config(metric='mean_accuracy', mode='max'))
+
+    main(config=config)
 
