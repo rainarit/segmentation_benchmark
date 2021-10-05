@@ -149,16 +149,17 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> using pre-trained model '{}'".format(args.arch))
         if "divnorm" in str(args.arch):
             model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=True, residual_divnorm=False, inplanes=args.inplanes)
+            model = models_resnet_divnorm.__dict__[model_name](pretrained=True, residual_divnorm=True, inplanes=args.inplanes)
         else:
-            model = models.__dict__[args.arch](pretrained=True, inplanes=args.inplanes)
+            model = models.__dict__[args.arch](pretrained=True, num_classes=100)
     else:
         print("=> creating model '{}'".format(args.arch))
         if "divnorm" in str(args.arch):
             model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=False, residual_divnorm=False, inplanes=args.inplanes)
+            model = models_resnet_divnorm.__dict__[model_name](pretrained=False, residual_divnorm=True, inplanes=args.inplanes)
         else:
-            model = models.__dict__[args.arch](pretrained=False, inplanes=args.inplanes)
+            model = models.__dict__[args.arch](pretrained=False, num_classes=100)
+            print("Created resnet with %s classes" % model.fc.out_features)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -246,19 +247,19 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+    # val_loader = torch.utils.data.DataLoader(
+    #     datasets.ImageFolder(valdir, transforms.Compose([
+    #         transforms.Resize(256),
+    #         transforms.CenterCrop(224),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ])),
+    #     batch_size=args.batch_size, shuffle=False,
+    #     num_workers=args.workers, pin_memory=True)
 
-    if args.evaluate:
-        validate(val_loader, model, criterion, args, writer, iterator)
-        return
+    # if args.evaluate:
+    #     validate(val_loader, model, criterion, args, writer, iterator)
+    #     return
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -329,6 +330,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
             output = model(images)
             loss = criterion(output, target)
             if torch.isnan(loss):
+                import ipdb; ipdb.set_trace()
                 print(output.min(), output.max(), target.min(), target.max(), loss)
 
         # measure accuracy and record loss
@@ -343,9 +345,15 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         
         if args.rank == 0:
             # Clamping parameters of divnorm to non-negative values
-            div_conv_weight = model.module.div.div.weight.data
-            div_conv_weight = div_conv_weight.clamp(min=0.)
-            model.module.div.div.weight.data = div_conv_weight
+            if "divnorm" in str(args.arch):
+                if args.multiprocessing_distributed:
+                    div_conv_weight = model.module.div.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.div.div.weight.data = div_conv_weight
+                else:
+                    div_conv_weight = model.div.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.div.div.weight.data = div_conv_weight
 
         # measure elapsed time
         batch_time.update(time.time() - end)

@@ -147,7 +147,8 @@ class ResNet(nn.Module):
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
-        num_classes: int = 1000,
+        inplanes: int = 64,
+        num_classes: int = 100,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
@@ -159,7 +160,7 @@ class ResNet(nn.Module):
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
 
-        self.inplanes = 64
+        self.inplanes = inplanes
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace

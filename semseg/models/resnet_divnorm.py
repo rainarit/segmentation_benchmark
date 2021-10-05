@@ -151,7 +151,7 @@ class ResNet_DivNorm(nn.Module):
         layers: List[int],
         residual_divnorm: bool = True,
         inplanes: int = 64,
-        num_classes: int = 1000,
+        num_classes: int = 100,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
