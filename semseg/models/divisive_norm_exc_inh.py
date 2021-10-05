@@ -241,6 +241,7 @@ class DivNormExcInh(nn.Module):
             print("| Using Gabor Filter Bank |")
         else:
             simple_cells = nn.Identity()(x)
+            simple_cells = simple_cells.float()
         if square_act:
             simple_cells = simple_cells ** 2
             norm = self.div(simple_cells) + self.sigma ** 2 + 1e-5
@@ -260,7 +261,6 @@ class DivNormExcInh(nn.Module):
             output = self.output_bn(simple_cells)
         if residual:
             output += identity
-        # TODO(vveeraba): replace with GeLU
         output = self.output_relu(output)
         return output
 
