@@ -159,12 +159,14 @@ class ResNet_DivNorm(nn.Module):
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         residual_divnorm: bool = True,
+        divnorm_fsize: int = 7,
     ) -> None:
         super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
         self.residual_divnorm = residual_divnorm
+        self.divnorm_fsize = divnorm_fsize
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -180,10 +182,10 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div_block1 = DivNormExcInh(64, None, None, None, None, 7)
-        self.div_block2 = DivNormExcInh(256, None, None, None, None, 7)
-        self.div_block3 = DivNormExcInh(512, None, None, None, None, 7)
-        self.div_block4 = DivNormExcInh(1024, None, None, None, None, 7)
+        self.div_block1 = DivNormExcInh(64, None, None, None, None, self.divnorm_fsize)
+        self.div_block2 = DivNormExcInh(256, None, None, None, None, self.divnorm_fsize)
+        self.div_block3 = DivNormExcInh(512, None, None, None, None, self.divnorm_fsize)
+        self.div_block4 = DivNormExcInh(1024, None, None, None, None, self.divnorm_fsize)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -282,9 +284,10 @@ def _resnet(
     layers: List[int],
     pretrained: bool,
     progress: bool,
+    divnorm_fsize: int,
     **kwargs: Any
 ) -> ResNet_DivNorm:
-    model = ResNet_DivNorm(block, layers, **kwargs)
+    model = ResNet_DivNorm(block, layers, divnorm_fsize=divnorm_fsize, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -316,14 +319,14 @@ def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet50(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet50(pretrained: bool = False, progress: bool = True, divnorm_fsize: int = 7, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
+    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress, divnorm_fsize=divnorm_fsize,
                    **kwargs)
 
 

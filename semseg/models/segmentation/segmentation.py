@@ -19,12 +19,13 @@ model_urls = {
 }
 
 
-def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True):
+def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained_backbone=True):
     if 'resnet_divnorm' in backbone_name:
         back_name = backbone_name.split('resnet_divnorm', 1)[1] 
         backbone = resnet_divnorm.__dict__[back_name](
             pretrained=pretrained_backbone,
-            replace_stride_with_dilation=[False, True, True])
+            replace_stride_with_dilation=[False, True, True], 
+            divnorm_fsize=divnorm_fsize)
         out_layer = 'layer4'
         out_inplanes = 2048
         aux_layer = 'layer3'
@@ -62,11 +63,11 @@ def _segm_model(name, backbone_name, num_classes, aux, pretrained_backbone=True)
     return model
 
 
-def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss, **kwargs):
+def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss, divnorm_fsize, **kwargs):
     if pretrained:
         aux_loss = True
         kwargs["pretrained_backbone"] = False
-    model = _segm_model(arch_type, backbone, num_classes, aux_loss, **kwargs)
+    model = _segm_model(arch_type, backbone, num_classes, aux_loss, divnorm_fsize, **kwargs)
     if pretrained:
         _load_weights(model, arch_type, backbone, progress)
     return model

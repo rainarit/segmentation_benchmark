@@ -249,7 +249,8 @@ def main(args):
                       pretrained=False,
                       progress=True, 
                       num_classes=num_classes, 
-                      aux_loss=args.aux_loss)
+                      aux_loss=args.aux_loss, 
+                      divnorm_fsize=7)
     
     model.to(device)
 
@@ -383,6 +384,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
 
     return parser
+
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()

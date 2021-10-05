@@ -26,10 +26,12 @@ from models.segmentation.segmentation import _load_model
 import ipdb
 import  csv
 
+import ray
 from ray import tune
-from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
 from functools import partial
+from ray.tune import CLIReporter
+from ray.tune.schedulers import AsyncHyperBandScheduler
 
 seed=42
 random.seed(seed)
@@ -158,34 +160,9 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-def optimize(num_samples=10, max_num_epochs=10, gpus_per_trial=1):
-    config = {
-        "divnorm_fsize": tune.choice([2, 4, 8, 16])
-    }
-    scheduler = ASHAScheduler(
-        metric="loss",
-        mode="min",
-        max_t=max_num_epochs,
-        grace_period=1,
-        reduction_factor=2)
-    reporter = CLIReporter(
-        metric_columns=["accuracy"])
-    result = tune.run(
-        partial(train_cifar, data_dir=data_dir),
-        resources_per_trial={"gpu": gpus_per_trial},
-        config=config,
-        num_samples=num_samples,
-        scheduler=scheduler,
-        progress_reporter=reporter)
-    best_trial = result.get_best_trial("loss", "min", "last")
-    print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(
-        best_trial.last_result["loss"]))
-    print("Best trial final validation accuracy: {}".format(
-        best_trial.last_result["accuracy"]))
-    
+def main(config, checkpoint_dir=None):
 
-def main(args):
+    args = config['args']
 
     utils.init_distributed_mode(args)
 
@@ -224,7 +201,8 @@ def main(args):
                       pretrained=False,
                       progress=True, 
                       num_classes=num_classes, 
-                      aux_loss=args.aux_loss)
+                      aux_loss=args.aux_loss, 
+                      divnorm_fsize=config['divnorm_fsize'])
     
     model.to(device)
 
@@ -253,14 +231,18 @@ def main(args):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
-    
+        
     if args.test_only:
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
         return
+
     
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
+
+        if epoch == 10:
+            return
 
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -271,6 +253,7 @@ def main(args):
         print(confmat)
 
         confmat_iu = confmat.get_IoU()
+        tune.report(mean_accuracy=confmat_iu)
         confmat_acc_global = confmat.get_acc_global_correct()
 
         mean_iou_list.append(confmat_iu)
@@ -323,6 +306,23 @@ def get_args_parser(add_help=True):
 
     return parser
 
+
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
-    main(args)
+
+
+    config = {
+    "divnorm_fsize": tune.grid_search([7, 11, 15]),
+    "args": args,
+    }
+
+    analysis = tune.run(
+        main,
+        name="experiment",
+        
+        resources_per_trial={"cpu": 0, "gpu": 2},
+        config=config,
+        num_samples=1)
+
+    print("Best config is:", analysis.get_best_config(metric='mean_accuracy', mode='max'))
+
