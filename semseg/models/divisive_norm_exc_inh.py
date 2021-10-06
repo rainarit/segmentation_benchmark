@@ -172,7 +172,7 @@ class DivNormExcInh(nn.Module):
                  l_sfs,
                  l_phase,
                  divnorm_fsize=5,
-                 exc_fsize=9,
+                 exc_fsize=7,
                  inh_fsize=5,
                  stride=4,
                  padding_mode='zeros',

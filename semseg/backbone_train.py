@@ -86,6 +86,17 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 best_acc1 = 0
 
+"""NOTE:
+If you are using NCCL backend, remember to set 
+the following environment variables in your Ampere series GPU.
+
+export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=ALL
+export NCCL_IB_DISABLE=1
+export NCCL_P2P_DISABLE=1
+export NCCL_SOCKET_IFNAME=eth0
+"""
+
 
 def main():
     args = parser.parse_args()
@@ -264,7 +275,7 @@ def main_worker(gpu, ngpus_per_node, args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        adjust_learning_rate(optimizer, epoch, args)
+        # adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
         acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator)
@@ -318,6 +329,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
+        # adjust learning rate at every step with warmup + cosine LR decay
+        adjust_learning_rate_cosine(args, optimizer, train_loader, i)
 
         if args.gpu is not None:
             images = images.cuda(args.gpu, non_blocking=True)
@@ -329,9 +342,14 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         with torch.cuda.amp.autocast():
             output = model(images)
             loss = criterion(output, target)
-            if torch.isnan(loss):
-                import ipdb; ipdb.set_trace()
-                print(output.min(), output.max(), target.min(), target.max(), loss)
+            # RELEASE below lines for no nan loss training
+            # loss = criterion(output.float(), target)
+            
+        if torch.isnan(loss):
+            import ipdb; ipdb.set_trace()
+            print(output.min(), output.max(), 
+                  target.min(), target.max(), 
+                  loss)
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -424,6 +442,21 @@ def adjust_learning_rate(optimizer, epoch, args):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
+
+def adjust_learning_rate_cosine(args, optimizer, loader, step):
+    max_steps = args.epochs * len(loader)
+    warmup_steps = 10 * len(loader)
+    base_lr = args.batch_size / 256
+    if step < warmup_steps:
+        lr = base_lr * step / warmup_steps
+    else:
+        step -= warmup_steps
+        max_steps -= warmup_steps
+        q = 0.5 * (1 + math.cos(math.pi * step / max_steps))
+        end_lr = base_lr * 0.001
+        lr = base_lr * q + end_lr * (1 - q)
+    optimizer.param_groups[0]['lr'] = lr * args.lr
+    
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
