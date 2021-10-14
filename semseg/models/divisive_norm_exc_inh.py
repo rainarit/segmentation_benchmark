@@ -214,7 +214,7 @@ class DivNormExcInh(nn.Module):
             self.output_bn = nn.BatchNorm2d(in_channels)
             self.output_relu = nn.ReLU(inplace=True)
     
-    def forward(self, x, residual=False, square_act=True):
+    def forward(self, x, residual=True, square_act=True):
         """
         params:
             x: Input activation tensor
@@ -227,7 +227,7 @@ class DivNormExcInh(nn.Module):
         else:
             return self.forward_divnormei(x, residual, square_act)
         
-    def forward_divnormei(self, x, residual=False, square_act=True, hor_conn=True):
+    def forward_divnormei(self, x, residual=True, square_act=True, hor_conn=True):
         """
         params:
           x: Input grayscale image tensor
@@ -241,7 +241,7 @@ class DivNormExcInh(nn.Module):
             print("| Using Gabor Filter Bank |")
         else:
             simple_cells = nn.Identity()(x)
-            simple_cells = simple_cells.float()
+
         if square_act:
             simple_cells = simple_cells ** 2
             norm = self.div(simple_cells) + self.sigma ** 2 + 1e-5
@@ -251,7 +251,7 @@ class DivNormExcInh(nn.Module):
         else:
             norm = 1 + F.relu(self.div(simple_cells))
             simple_cells = simple_cells / norm
-        # Inhibitory cells (subtractive)
+
         if hor_conn:
             inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
             # Excitatory lateral connections (Center corresponds to self-excitation)
