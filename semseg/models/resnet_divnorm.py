@@ -182,10 +182,10 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div_block1 = DivNormExcInh(64, None, None, None, None, self.divnorm_fsize)
-        self.div_block2 = DivNormExcInh(256, None, None, None, None, self.divnorm_fsize)
-        self.div_block3 = DivNormExcInh(512, None, None, None, None, self.divnorm_fsize)
-        self.div_block4 = DivNormExcInh(1024, None, None, None, None, self.divnorm_fsize)
+        self.div_block1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div_block2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div_block3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div_block4 = DivNormExcInh(1024, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -196,12 +196,15 @@ class ResNet_DivNorm(nn.Module):
                                        dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         self.calls = 2
 
-        for m in self.modules():
+        for k, m in self.named_modules():
+            print(k)
+            if ".div" in k:
+                print(342342342345)
+                # Don't reinitialize div.divnorm weights
+                continue
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
@@ -246,31 +249,34 @@ class ResNet_DivNorm(nn.Module):
     def _forward_impl(self, x: Tensor, use_bn1=True) -> Tensor:
         # See note [TorchScript super()]
         return_dict = {}
+
         x = self.conv1(x)
+
         x = self.bn1(x)
+        
         x = self.relu(x)
 
         # Adding divnorm to the final output of conv1
-        x = self.div_block1(x, residual=self.residual_divnorm)
+        x = self.div_block1(x, residual=self.residual_divnorm, square_act=True)
+
         x = self.maxpool(x)
 
-
         x = self.layer1(x)
-        x = self.div_block2(x, residual=self.residual_divnorm)
+
+        x = self.div_block2(x, residual=self.residual_divnorm, square_act=True)
 
         x = self.layer2(x)
-        x = self.div_block3(x, residual=self.residual_divnorm)
+
+        x = self.div_block3(x, residual=self.residual_divnorm, square_act=True)
 
         x = self.layer3(x)
-        x = self.div_block4(x, residual=self.residual_divnorm)
+
+        x = self.div_block4(x, residual=self.residual_divnorm, square_act=True)
         return_dict['aux'] = x
 
         x = self.layer4(x)
         return_dict['out'] = x
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        
         #return x
         return return_dict
 

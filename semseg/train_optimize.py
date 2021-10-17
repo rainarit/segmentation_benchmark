@@ -313,7 +313,7 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(True)
 
     config = {
-    "divnorm_fsize": tune.grid_search([5, 7]),
+    "divnorm_fsize": tune.grid_search([7]),
     #"divnorm_fsize": 5,
     "args": args,
     }

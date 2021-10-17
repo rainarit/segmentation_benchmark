@@ -172,7 +172,7 @@ class DivNormExcInh(nn.Module):
                  l_sfs,
                  l_phase,
                  divnorm_fsize=5,
-                 exc_fsize=9,
+                 exc_fsize=7,
                  inh_fsize=5,
                  stride=4,
                  padding_mode='zeros',
@@ -183,7 +183,6 @@ class DivNormExcInh(nn.Module):
         super(DivNormExcInh, self).__init__()
         self.in_channels = in_channels
         self.alexnet_lrn = alexnet_lrn
-        self.divnorm_fsize = divnorm_fsize
         if in_channels <= 3:
             self.gfb = GaborFilterBank(in_channels, l_filter_size,
                                        l_theta, l_sfs, l_phase, stride=stride,
@@ -197,8 +196,8 @@ class DivNormExcInh(nn.Module):
             self.div = nn.Conv2d(
                 self.hidden_dim,
                 self.hidden_dim,
-                self.divnorm_fsize,
-                padding=(self.divnorm_fsize - 1) // 2,
+                divnorm_fsize,
+                padding=(divnorm_fsize - 1) // 2,
                 padding_mode=padding_mode,
                 groups=self.hidden_dim,
                 bias=False)
@@ -215,7 +214,7 @@ class DivNormExcInh(nn.Module):
             self.output_bn = nn.BatchNorm2d(in_channels)
             self.output_relu = nn.ReLU(inplace=True)
     
-    def forward(self, x, residual=True, square_act=False):
+    def forward(self, x, residual=True, square_act=True):
         """
         params:
             x: Input activation tensor
@@ -228,7 +227,7 @@ class DivNormExcInh(nn.Module):
         else:
             return self.forward_divnormei(x, residual, square_act)
         
-    def forward_divnormei(self, x, residual=True, square_act=False, hor_conn=True):
+    def forward_divnormei(self, x, residual=True, square_act=True, hor_conn=True):
         """
         params:
           x: Input grayscale image tensor
@@ -242,7 +241,7 @@ class DivNormExcInh(nn.Module):
             print("| Using Gabor Filter Bank |")
         else:
             simple_cells = nn.Identity()(x)
-            simple_cells = simple_cells.float()
+
         if square_act:
             simple_cells = simple_cells ** 2
             norm = self.div(simple_cells) + self.sigma ** 2 + 1e-5
@@ -250,9 +249,10 @@ class DivNormExcInh(nn.Module):
                 import ipdb; ipdb.set_trace()
             simple_cells = simple_cells / norm
         else:
-            norm = 1 + F.relu(self.div(simple_cells))
+            #norm = 1 + F.relu(self.div(simple_cells))
+            norm = F.relu(self.div(simple_cells)) + self.sigma ** 2 + 1e-5
             simple_cells = simple_cells / norm
-        # Inhibitory cells (subtractive)
+
         if hor_conn:
             inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
             # Excitatory lateral connections (Center corresponds to self-excitation)

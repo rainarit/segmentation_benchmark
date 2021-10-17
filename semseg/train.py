@@ -26,7 +26,7 @@ from models.segmentation.segmentation import _load_model
 import ipdb
 import  csv
 
-seed=42
+seed=429
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
 np.random.seed(seed)
@@ -36,7 +36,7 @@ torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 g = torch.Generator()
-g.manual_seed(42)
+g.manual_seed(seed)
 
 evaluate_step = 0
 train_step = 0
@@ -88,12 +88,37 @@ def get_transform(train):
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def criterion(inputs, target):
+    classes = list(np.unique(target.detach().cpu().numpy(), return_counts=True)[0])
+    index_255 = classes.index(255)
+    classes_count = list(np.unique(target.detach().cpu().numpy(), return_counts=True)[1])
+    classes_count.pop(index_255)
+    classes.pop(index_255)
+
+    weights = [0.] * 21
+    
+    for index in range(len(classes)):
+        weights[classes[index]] =  max(classes_count)/classes_count[index]
+    
+    weights = torch.FloatTensor(weights).cuda()
+
     losses = {}
+
+    loss = nn.CrossEntropyLoss(weight=weights, size_average=True, ignore_index=255, reduce=True, reduction='mean')
+
     for name, x in inputs.items():
-        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
+        losses[name] = loss(input=x, target=target)
+    
     if len(losses) == 1:
         return losses['out']
+    
     return losses['out'] + 0.5 * losses['aux']
+
+    # losses = {}
+    # for name, x in inputs.items():
+    #     losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255, reduction='mean')
+    # if len(losses) == 1:
+    #     return losses['out']
+    # return losses['out'] + 0.5 * losses['aux']
 
 def evaluate(model, data_loader, device, num_classes, iterator):
     model.eval()
@@ -109,27 +134,28 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             output = output['out']
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
+            
+            if args.use_tensorboard:
+                if ".mat" in data_loader.dataset.masks[idx]:
+                    ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
+                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
 
-            if ".mat" in data_loader.dataset.masks[idx]:
-                ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+                    writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+                    writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
+                    writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+                    writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+                    writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+                else:
+                    ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
 
-                writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-            else:
-                ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+                    writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+                    writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
+                    writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+                    writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+                    writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+                writer.flush()
 
-                writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-                writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-
-            writer.flush()
             iterator.add_eval()
 
         confmat.reduce_from_all_processes()
@@ -147,52 +173,76 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
     header = 'Epoch: [{}]'.format(epoch)
 
+    # Creates once at the beginning of training
+    scaler = torch.cuda.amp.GradScaler()
+
     for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-
+        
         image, target = image.to(device), target.to(device)
-        output = model(image)
 
-        loss = criterion(output, target)
-
+        # Casts operations to mixed precision
         optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        with torch.cuda.amp.autocast():
+            output = model(image)
+            loss = criterion(output, target)
+
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         lr_scheduler.step()
 
+        if args.rank == 0:
+            # Clamping parameters of divnorm to non-negative values
+            if "divnorm" in str(args.backbone):
+                if args.distributed:
+                    div_conv_weight = model.module.div.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.div.div.weight.data = div_conv_weight
+                else:
+                    div_conv_weight = model.div.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.div.div.weight.data = div_conv_weight
+
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
-
-        if idx%10==0:
-            if ".mat" in data_loader.dataset.masks[idx]:
-                ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-                writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HW')
-                writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-                writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-                writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
-            else:
-                ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-                writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
-                writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-                writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-                writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
-
-        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
 
         confmat_train = utils.ConfusionMatrix(21)
         confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
+        if args.use_tensorboard:
+            if idx%1==0:
+                if ".mat" in data_loader.dataset.masks[idx]:
+                    ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
+                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+                    writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
+                    writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HW')
+                    writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
+                    writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
+                    writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
+                else:
+                    ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+                    writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
+                    writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
+                    writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
+                    writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
+                    writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
 
-        writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
-        writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
-        writer.flush()
+                for name, param in model.named_parameters():
+                    writer.add_histogram(str(name), param, idx)
+                    writer.flush()
+
+                    if len(param.shape) == 4:
+                        filter = param.detach().cpu()
+                        img = visTensor(filter, ch=0, allkernels=False)
+                        writer.add_image('Filters/'+ str(name), img, idx, dataformats='HWC')
+
+            writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
+            writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
+            writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
+            writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
+            writer.flush()
 
         iterator.add_train()
 
@@ -220,6 +270,7 @@ def main(args):
     checkpoints_list = list()
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
+
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
     if args.distributed:
@@ -228,7 +279,6 @@ def main(args):
     else:
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
-
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size,
@@ -240,17 +290,13 @@ def main(args):
         sampler=test_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    #model = torchvision.models.segmentation.__dict__[args.model](num_classes=num_classes,
-    #                                                             aux_loss=args.aux_loss,
-    #                                                             pretrained=args.pretrained)
-
     model = _load_model(arch_type=args.model, 
                       backbone=args.backbone,
                       pretrained=False,
                       progress=True, 
                       num_classes=num_classes, 
                       aux_loss=args.aux_loss, 
-                      divnorm_fsize=7)
+                      divnorm_fsize=5)
     
     model.to(device)
 
@@ -293,18 +339,16 @@ def main(args):
 
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
 
-        for name, param in model.named_parameters():
-            writer.add_histogram(str(name), param, epoch)
-            writer.flush()
+        # if args.use_tensorboard:
+        #     for name, param in model.named_parameters():
+        #         writer.add_histogram(str(name), param, epoch)
+        #         writer.flush()
 
-            if len(param.shape) == 4:
-                filter = param.detach().cpu()
-                img = visTensor(filter, ch=0, allkernels=False)
-                writer.add_image('Filters/'+ str(name), img, epoch, dataformats='HWC')
+        #         if len(param.shape) == 4:
+        #             filter = param.detach().cpu()
+        #             img = visTensor(filter, ch=0, allkernels=False)
+        #             writer.add_image('Filters/'+ str(name), img, epoch, dataformats='HWC')
                 
-                
-
-
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
 
@@ -313,9 +357,10 @@ def main(args):
 
         mean_iou_list.append(confmat_iu)
 
-        writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
-        writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
-        writer.flush()
+        if args.use_tensorboard:
+            writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
+            writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
+            writer.flush()
 
         checkpoint = {
             'model': model_without_ddp.state_dict(),
@@ -362,6 +407,7 @@ def get_args_parser(add_help=True):
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='./output_models', help='path where to save')
+    parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
@@ -385,8 +431,8 @@ def get_args_parser(add_help=True):
 
     return parser
 
-
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
-    writer = SummaryWriter(str(args.tensorboard_dir))
+    if args.use_tensorboard:
+        writer = SummaryWriter(str(args.tensorboard_dir))
     main(args)
