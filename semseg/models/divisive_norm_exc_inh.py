@@ -53,7 +53,6 @@ def generate_gabor_filter_weights(sz, l_theta, l_sfs,
         return gabor_bank, theta2filter
     return gabor_bank
 
-
 # define normalized 2D gaussian
 def get_gaussian_filterbank(n_filters, f_sz, device='cuda'):
     """Generate a torch tensor for conv2D weights resembling 2D gaussian"""
@@ -78,7 +77,6 @@ def get_gaussian_filterbank(n_filters, f_sz, device='cuda'):
     filters = filters.reshape((n_filters, 1, f_sz, f_sz))
     filters = torch.Tensor(filters).float().to(device)
     return filters
-
 
 def nonnegative_weights_init(m):
     """Non-negative initialization of weights."""
@@ -214,7 +212,7 @@ class DivNormExcInh(nn.Module):
             self.output_bn = nn.BatchNorm2d(in_channels)
             self.output_relu = nn.ReLU(inplace=True)
     
-    def forward(self, x, residual=True, square_act=True):
+    def forward(self, x, residual=True, square_act=True, hor_conn=True):
         """
         params:
             x: Input activation tensor
@@ -225,7 +223,7 @@ class DivNormExcInh(nn.Module):
             del residual, square_act
             return self.forward_alexnet_lrn(x)
         else:
-            return self.forward_divnormei(x, residual, square_act)
+            return self.forward_divnormei(x=x, residual=residual, square_act=square_act, hor_conn=hor_conn)
         
     def forward_divnormei(self, x, residual=True, square_act=True, hor_conn=True):
         """
@@ -249,19 +247,22 @@ class DivNormExcInh(nn.Module):
                 import ipdb; ipdb.set_trace()
             simple_cells = simple_cells / norm
         else:
-            #norm = 1 + F.relu(self.div(simple_cells))
-            norm = F.relu(self.div(simple_cells)) + self.sigma ** 2 + 1e-5
+            norm = 1 + F.relu(self.div(simple_cells))
+            #norm = F.relu(self.div(simple_cells)) + self.sigma ** 2 + 1e-5
             simple_cells = simple_cells / norm
 
         if hor_conn:
             inhibition = self.i_e(simple_cells)  # + self.i_ff(x)
             # Excitatory lateral connections (Center corresponds to self-excitation)
             excitation = self.e_e(simple_cells)
+            #output = simple_cells + excitation - inhibition
             output = self.output_bn(simple_cells + excitation - inhibition)
         else:
             output = self.output_bn(simple_cells)
+
         if residual:
             output += identity
+
         output = self.output_relu(output)
         return output
 

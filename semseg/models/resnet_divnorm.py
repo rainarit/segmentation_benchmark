@@ -182,10 +182,9 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div_block1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
-        self.div_block2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
-        self.div_block3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
-        self.div_block4 = DivNormExcInh(1024, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -200,9 +199,7 @@ class ResNet_DivNorm(nn.Module):
         self.calls = 2
 
         for k, m in self.named_modules():
-            print(k)
             if ".div" in k:
-                print(342342342345)
                 # Don't reinitialize div.divnorm weights
                 continue
             if isinstance(m, nn.Conv2d):
@@ -256,29 +253,28 @@ class ResNet_DivNorm(nn.Module):
         
         x = self.relu(x)
 
-        # Adding divnorm to the final output of conv1
-        x = self.div_block1(x, residual=self.residual_divnorm, square_act=True)
-
         x = self.maxpool(x)
 
-        x = self.layer1(x)
+        x = self.div1(x, residual=False, square_act=False, hor_conn=True)
 
-        x = self.div_block2(x, residual=self.residual_divnorm, square_act=True)
+        x = self.layer1(x)
+        
+        x = self.div2(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer2(x)
 
-        x = self.div_block3(x, residual=self.residual_divnorm, square_act=True)
+        x = self.div3(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer3(x)
 
-        x = self.div_block4(x, residual=self.residual_divnorm, square_act=True)
         return_dict['aux'] = x
 
         x = self.layer4(x)
-        return_dict['out'] = x
         
-        #return x
+        return_dict['out'] = x
+
         return return_dict
+        #return x
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)

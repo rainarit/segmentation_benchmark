@@ -88,37 +88,37 @@ def get_transform(train):
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
 def criterion(inputs, target):
-    # classes = list(np.unique(target.detach().cpu().numpy(), return_counts=True)[0])
-    # index_255 = classes.index(255)
-    # classes_count = list(np.unique(target.detach().cpu().numpy(), return_counts=True)[1])
-    # classes_count.pop(index_255)
-    # classes.pop(index_255)
+    classes = list(np.unique(target.detach().cpu().numpy(), return_counts=True)[0])
+    index_255 = classes.index(255)
+    classes_count = list(np.unique(target.detach().cpu().numpy(), return_counts=True)[1])
+    classes_count.pop(index_255)
+    classes.pop(index_255)
 
-    # weights = [0.] * 21
+    weights = [0.] * 21
     
-    # for index in range(len(classes)):
-    #     weights[classes[index]] =  max(classes_count)/classes_count[index]
+    for index in range(len(classes)):
+        weights[classes[index]] =  max(classes_count)/classes_count[index]
     
-    # weights = torch.FloatTensor(weights).cuda()
-
-    # losses = {}
-
-    # loss = nn.CrossEntropyLoss(weight=weights, size_average=True, ignore_index=255, reduce=True, reduction='mean')
-
-    # for name, x in inputs.items():
-    #     losses[name] = loss(input=x, target=target)
-    
-    # if len(losses) == 1:
-    #     return losses['out']
-    
-    # return losses['out'] + 0.5 * losses['aux']
+    weights = torch.FloatTensor(weights).cuda()
 
     losses = {}
+
+    loss = nn.CrossEntropyLoss(weight=weights, size_average=True, ignore_index=255, reduce=True, reduction='mean')
+
     for name, x in inputs.items():
-        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255, reduction='mean')
+        losses[name] = loss(input=x, target=target)
+    
     if len(losses) == 1:
         return losses['out']
+    
     return losses['out'] + 0.5 * losses['aux']
+
+    # losses = {}
+    # for name, x in inputs.items():
+    #     losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255, reduction='mean')
+    # if len(losses) == 1:
+    #     return losses['out']
+    # return losses['out'] + 0.5 * losses['aux']
 
 def evaluate(model, data_loader, device, num_classes, iterator):
     model.eval()
@@ -136,26 +136,25 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             confmat.update(target.flatten(), output.argmax(1).flatten())
             
             if args.use_tensorboard:
-                if idx == -1:
-                    if ".mat" in data_loader.dataset.masks[idx]:
-                        ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+                if ".mat" in data_loader.dataset.masks[idx]:
+                    ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
+                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
 
-                        writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                        writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-                    else:
-                        ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+                    writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+                    writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
+                    writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+                    writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+                    writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+                else:
+                    ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
+                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
 
-                        writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                        writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-                    writer.flush()
+                    writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
+                    writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
+                    writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
+                    writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
+                    writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
+                writer.flush()
 
             iterator.add_eval()
 
@@ -193,25 +192,41 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         lr_scheduler.step()
 
-        # Clamping parameters of divnorm to non-negative values
-        if "divnorm" in str(args.backbone):
-            if args.distributed:
-                div_conv_weight = model.module.backbone.div1.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div1.div.weight.data = div_conv_weight
+        if args.rank == 0:
+            # Clamping parameters of divnorm to non-negative values
+            if "divnorm" in str(args.backbone):
+                if args.distributed:
+                    div_conv_weight = model.module.backbone.div_block1.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block1.div.weight.data = div_conv_weight
 
-                div_conv_weight = model.module.backbone.div2.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div2.div.weight.data = div_conv_weight
+                    div_conv_weight = model.module.backbone.div_block2.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block2.div.weight.data = div_conv_weight
 
-            else:
-                div_conv_weight = model.module.backbone.div1.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div1.div.weight.data = div_conv_weight
+                    div_conv_weight = model.module.backbone.div_block3.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block3.div.weight.data = div_conv_weight
 
-                div_conv_weight = model.module.backbone.div2.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div2.div.weight.data = div_conv_weight
+                    div_conv_weight = model.module.backbone.div_block4.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block4.div.weight.data = div_conv_weight
+                else:
+                    div_conv_weight = model.module.backbone.div_block1.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block1.div.weight.data = div_conv_weight
+
+                    div_conv_weight = model.module.backbone.div_block2.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block2.div.weight.data = div_conv_weight
+
+                    div_conv_weight = model.module.backbone.div_block3.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block3.div.weight.data = div_conv_weight
+
+                    div_conv_weight = model.module.backbone.div_block4.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.backbone.div_block4.div.weight.data = div_conv_weight
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -220,7 +235,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
         if args.use_tensorboard:
-            if idx == -1:
+            if idx%1==0:
                 if ".mat" in data_loader.dataset.masks[idx]:
                     ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
                     ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
@@ -237,6 +252,15 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
                     writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
                     writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
                     writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
+
+                for name, param in model.named_parameters():
+                    writer.add_histogram(str(name), param, idx)
+                    writer.flush()
+
+                    if len(param.shape) == 4:
+                        filter = param.detach().cpu()
+                        img = visTensor(filter, ch=0, allkernels=False)
+                        writer.add_image('Filters/'+ str(name), img, idx, dataformats='HWC')
 
             writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
             writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
@@ -338,6 +362,16 @@ def main(args):
             train_sampler.set_epoch(epoch)
 
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
+
+        # if args.use_tensorboard:
+        #     for name, param in model.named_parameters():
+        #         writer.add_histogram(str(name), param, epoch)
+        #         writer.flush()
+
+        #         if len(param.shape) == 4:
+        #             filter = param.detach().cpu()
+        #             img = visTensor(filter, ch=0, allkernels=False)
+        #             writer.add_image('Filters/'+ str(name), img, epoch, dataformats='HWC')
                 
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
@@ -396,7 +430,7 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output-dir', default='./output_models_exp6', help='path where to save')
+    parser.add_argument('--output-dir', default='./output_models_exp3', help='path where to save')
     parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
     parser.add_argument('--resume', default='', help='resume from checkpoint')

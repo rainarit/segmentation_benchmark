@@ -30,7 +30,7 @@
 
 export CUDA_VISIBLE_DEVICES=2
 
-python3 -m torch.distributed.launch --nproc_per_node=1 --master_port 19006 --use_env train.py --lr 0.02 --epochs 30 --dataset voc_aug -b 32 --wd 0 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --aux-loss 
+python3 -m torch.distributed.launch --nproc_per_node=1 --master_port 19008 --use_env train.py --lr 0.02 --epochs 30 --dataset voc_aug -b 32 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --aux-loss 
 
 # # Evaluate Model
 # pkill -f bench
