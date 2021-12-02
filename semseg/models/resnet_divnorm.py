@@ -1,3 +1,4 @@
+from numpy.core.arrayprint import format_float_scientific
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -182,9 +183,9 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
-        self.div2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
-        self.div3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize)
+        self.div1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=True, groups=64)
+        self.div2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=True, groups=256)
+        self.div3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -258,14 +259,16 @@ class ResNet_DivNorm(nn.Module):
         x = self.div1(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer1(x)
-        
-        x = self.div2(x, residual=False, square_act=False, hor_conn=True)
 
+        x = self.div2(x, residual=False, square_act=False, hor_conn=True)
+        
         x = self.layer2(x)
 
         x = self.div3(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer3(x)
+
+        # x = self.div4(x, residual=False, square_act=False, hor_conn=True)
 
         return_dict['aux'] = x
 

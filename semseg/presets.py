@@ -12,11 +12,15 @@ class SegmentationPresetTrain:
             T.RandomCrop(crop_size),
             T.ToTensor(),
             T.Normalize(mean=mean, std=std),
+            #T.ColorJitter(contrast=(0,100)),
         ])
         self.transforms = T.Compose(trans)
 
     def __call__(self, img, target):
-        return self.transforms(img, target)
+        aug_img, target = self.transforms(img, target)
+
+        return aug_img, target
+        #return aug_img, img
 
 class SegmentationPresetEval:
     def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
@@ -24,7 +28,10 @@ class SegmentationPresetEval:
             T.RandomResize(base_size, base_size),
             T.ToTensor(),
             T.Normalize(mean=mean, std=std),
+            T.ColorJitter(contrast=(1,100)),
         ])
 
     def __call__(self, img, target):
-        return self.transforms(img, target)
+        aug_img, target = self.transforms(img, target)
+        
+        return aug_img, target

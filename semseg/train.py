@@ -125,6 +125,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
+    iou_file = str(args.output_dir) + "eval_per_image_mean_iou.csv"
 
     with torch.no_grad():
         start_time = time.time()
@@ -134,9 +135,12 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             output = output['out']
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
-            
+            with open(iou_file,"w") as f:
+                wr = csv.writer(f,delimiter="\n")
+                wr.writerow(confmat)
+
             if args.use_tensorboard:
-                if idx == -1:
+                if idx != -1:
                     if ".mat" in data_loader.dataset.masks[idx]:
                         ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
                         ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
@@ -220,7 +224,7 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
 
         if args.use_tensorboard:
-            if idx == -1:
+            if idx % 10 == 0:
                 if ".mat" in data_loader.dataset.masks[idx]:
                     ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
                     ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
@@ -300,6 +304,10 @@ def main(args):
     
     model.to(device)
 
+    if args.use_load:
+        checkpoint = torch.load(args.load_dir)
+        model.load_state_dict(checkpoint['model'])
+
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
@@ -325,12 +333,21 @@ def main(args):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
+
+    if args.use_load:
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
     
     if args.test_only:
+        if args.resume != '':
+            checkpoint = torch.load(str(args.resume), map_location='cpu')
+            model_without_ddp.load_state_dict(checkpoint['model'])
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
         return
     
+    iou_file = str(args.output_dir) + ".csv"
+
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
 
@@ -345,7 +362,9 @@ def main(args):
         confmat_iu = confmat.get_IoU()
         confmat_acc_global = confmat.get_acc_global_correct()
 
-        mean_iou_list.append(confmat_iu)
+        with open(iou_file,"w") as f:
+            wr = csv.writer(f,delimiter="\n")
+            wr.writerow(confmat_iu)
 
         if args.use_tensorboard:
             writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
@@ -361,11 +380,6 @@ def main(args):
         }
         utils.save_on_master(checkpoint, os.path.join(args.output_dir, 'checkpoint_{}.pth'.format(epoch)))
         checkpoints_list.append(checkpoint)
-
-    iou_file = str(args.model) + str(args.backbone) + ".csv"
-    with open(iou_file,"w") as f:
-        wr = csv.writer(f,delimiter="\n")
-        wr.writerow(mean_iou_list)
 
     max_iou_index = mean_iou_list.index(max(mean_iou_list))
     utils.save_on_master(checkpoints_list[max_iou_index], os.path.join(args.output_dir, 'best_checkpoint.pth'))
@@ -396,7 +410,9 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output-dir', default='./output_models_exp6', help='path where to save')
+    parser.add_argument('--output-dir', default='./deeplabv3resnet50', help='path where to save')
+    parser.add_argument('--use-load', dest="use_load", help="Flag to use model checkpoint", action="store_true",)
+    parser.add_argument('--load-dir', default='./deeplabv3resnet50', help='path where to get model from')
     parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
     parser.add_argument('--resume', default='', help='resume from checkpoint')

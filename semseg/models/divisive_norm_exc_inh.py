@@ -1,4 +1,5 @@
 """Schwartz and Simoncelli 2001 + excitation and inhibition, in pytorch."""
+from numpy.core.numeric import True_
 import torch  # pylint: disable=import-error
 import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
@@ -177,6 +178,7 @@ class DivNormExcInh(nn.Module):
                  groups=1,
                  device='cuda',
                  alexnet_lrn=False,
+                 gaussian_init=True,
                  ):
         super(DivNormExcInh, self).__init__()
         self.in_channels = in_channels
@@ -197,9 +199,10 @@ class DivNormExcInh(nn.Module):
                 divnorm_fsize,
                 padding=(divnorm_fsize - 1) // 2,
                 padding_mode=padding_mode,
-                groups=self.hidden_dim,
+                groups=groups,
                 bias=False)
-            gaussian_weights_init(self.div)
+            if gaussian_init:
+                gaussian_weights_init(self.div)
             self.e_e = nn.Conv2d(
                 self.hidden_dim, self.hidden_dim, 
                 exc_fsize, bias=True, padding=(exc_fsize - 1) // 2,
