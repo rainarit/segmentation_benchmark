@@ -28,9 +28,10 @@
 #python3 -m torch.distributed.launch --nproc_per_node=2 --use_env train.py --lr 0.02 --dataset voc_aug -b 16 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --tensorboard-dir deeplabv3_resnet_divnormresnet50 --aux-loss
 #pkill bench
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=3
 
-python3 -m torch.distributed.launch --nproc_per_node=1 --master_port 19020 --use_env train.py --lr 0.02 --epochs 50 --dataset voc_aug -b 32 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --output-dir resnet_divnormresnet50_divnorm_after_maxpool_after_layer1_after_layer2_groups=1 --load-dir /home/AD/rraina/segmentation_benchmark/semseg/resnet_divnormresnet50_divnorm_after_maxpool_after_layer1_after_layer2_groups=1/checkpoint_30.pth --start-epoch 30 --use-load --aux-loss
+python3 -m torch.distributed.launch --nproc_per_node=1 --master_port 19030 --use_env train.py --lr 0.02 --epochs 50 --dataset voc_aug -b 32 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --output-dir resnet_divnormresnet50_divnorm_after_maxpool_groups=1_test --aux-loss --test-only --use-load "/home/AD/rraina/segmentation_benchmark/semseg/resnet_divnormresnet50_divnorm_before_maxpool_987/checkpoint_49.pth"
+#python3 -m torch.distributed.launch --nproc_per_node=1 --master_port 19020 --use_env eval_iou.py --lr 0.02 --epochs 50 --dataset voc_aug -b 32 --model deeplabv3 --backbone resnet_divnormresnet50 --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset --output-dir resnet_divnormresnet50_divnorm_after_maxpool_after_layer1_after_layer2_groups=1 --aux-loss
 
 
 # --resume /home/AD/rraina/segmentation_benchmark/semseg/resnet_divnormresnet50_divnorm_after_maxpool_after_layer1_after_layer2_groups=1/best_checkpoint.pth --test-only

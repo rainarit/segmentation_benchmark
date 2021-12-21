@@ -123,6 +123,10 @@ class ConfusionMatrix(object):
     def get_IoU(self):
         acc_global, acc, iu = self.compute()
         return iu.mean().item() * 100
+    
+    def get_IoU_row(self):
+        acc_global, acc, iu = self.compute()
+        return (iu * 100).tolist()
 
     def get_acc_global_correct(self):
         acc_global, acc, iu = self.compute()

@@ -21,12 +21,16 @@ import torch
 import torch.distributed as dist
 import matplotlib.pyplot as plt
 import math
+
+from torchvision.utils import save_image
+import torch
+import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from models.segmentation.segmentation import _load_model
 import ipdb
 import  csv
 
-seed=429
+seed=565
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
 np.random.seed(seed)
@@ -120,24 +124,28 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, iterator):
+def evaluate(model, csvwriter, data_loader, device, num_classes, iterator):
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
-    iou_file = str(args.output_dir) + "eval_per_image_mean_iou.csv"
 
     with torch.no_grad():
         start_time = time.time()
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+            confmat_image = utils.ConfusionMatrix(num_classes)
             image, target = image.to(device), target.to(device)
+            if idx == 10:
+                save_image(image, 'img1.png')
             output = model(image)
             output = output['out']
 
+            confmat_image.update(target.flatten(), output.argmax(1).flatten())
+            acc_global, acc, iu = confmat_image.compute()
+            if csvwriter != "":
+                csvwriter.writerow(list((iu * 100).tolist()))
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
-            with open(iou_file,"w") as f:
-                wr = csv.writer(f,delimiter="\n")
-                wr.writerow(confmat)
 
             if args.use_tensorboard:
                 if idx != -1:
@@ -162,6 +170,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
                     writer.flush()
 
             iterator.add_eval()
+            confmat_image.reduce_from_all_processes()
 
         confmat.reduce_from_all_processes()
 
@@ -304,8 +313,8 @@ def main(args):
     
     model.to(device)
 
-    if args.use_load:
-        checkpoint = torch.load(args.load_dir)
+    if args.use_load != "":
+        checkpoint = torch.load(args.use_load)
         model.load_state_dict(checkpoint['model'])
 
     if args.distributed:
@@ -342,48 +351,47 @@ def main(args):
         if args.resume != '':
             checkpoint = torch.load(str(args.resume), map_location='cpu')
             model_without_ddp.load_state_dict(checkpoint['model'])
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
+        confmat = evaluate(model, "", data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
         print(confmat)
         return
     
     iou_file = str(args.output_dir) + ".csv"
+    iou_image_file = str(args.output_dir) + "eval_per_image_mean_iou.csv"
 
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
+    with open(iou_image_file, 'w') as csvfile_image: 
+        with open(iou_file, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter_image = csv.writer(csvfile_image)
+            for epoch in range(args.start_epoch, args.epochs):
 
-        if args.distributed:
-            train_sampler.set_epoch(epoch)
+                if args.distributed:
+                    train_sampler.set_epoch(epoch)
 
-        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
+                train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
                 
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
-        print(confmat)
+                confmat = evaluate(model, csvwriter_image, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
+                print(confmat)
 
-        confmat_iu = confmat.get_IoU()
-        confmat_acc_global = confmat.get_acc_global_correct()
+                confmat_iu = confmat.get_IoU()
+                csvwriter_image.writerow([str(confmat_iu)])
+                confmat_acc_global = confmat.get_acc_global_correct()
 
-        with open(iou_file,"w") as f:
-            wr = csv.writer(f,delimiter="\n")
-            wr.writerow(confmat_iu)
+                if args.use_tensorboard:
+                    writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
+                    writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
+                    writer.flush()
 
-        if args.use_tensorboard:
-            writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
-            writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
-            writer.flush()
+                checkpoint = {
+                    'model': model_without_ddp.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),
+                    'epoch': epoch,
+                    'args': args
+                }
+                utils.save_on_master(checkpoint, os.path.join(args.output_dir, 'checkpoint_{}.pth'.format(epoch)))
+                checkpoints_list.append(checkpoint)
 
-        checkpoint = {
-            'model': model_without_ddp.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'lr_scheduler': lr_scheduler.state_dict(),
-            'epoch': epoch,
-            'args': args
-        }
-        utils.save_on_master(checkpoint, os.path.join(args.output_dir, 'checkpoint_{}.pth'.format(epoch)))
-        checkpoints_list.append(checkpoint)
-
-    max_iou_index = mean_iou_list.index(max(mean_iou_list))
-    utils.save_on_master(checkpoints_list[max_iou_index], os.path.join(args.output_dir, 'best_checkpoint.pth'))
-    
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
@@ -393,6 +401,7 @@ def get_args_parser(add_help=True):
     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
+    parser.add_argument('--seed', default=429, type=float, help='seed')
     parser.add_argument('--dataset', default='coco', help='dataset name')
     parser.add_argument('--model', default='deeplabv3', help='model')
     parser.add_argument('--backbone', default='resnet101', help='backbone')
@@ -411,7 +420,7 @@ def get_args_parser(add_help=True):
                         dest='weight_decay')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='./deeplabv3resnet50', help='path where to save')
-    parser.add_argument('--use-load', dest="use_load", help="Flag to use model checkpoint", action="store_true",)
+    parser.add_argument('--use-load', default='', help='path where to save')
     parser.add_argument('--load-dir', default='./deeplabv3resnet50', help='path where to get model from')
     parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
