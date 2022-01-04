@@ -1,8 +1,10 @@
 import datetime
 import os
 import time
+from numpy.lib import index_tricks
 import torch
 import torch.utils.data
+import transforms as T
 from torch import nn
 import torchvision
 import numpy as np
@@ -27,7 +29,6 @@ import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from models.segmentation.segmentation import _load_model
-import ipdb
 import  csv
 from torchvision.utils import save_image
 
@@ -90,7 +91,7 @@ def get_mask(output):
 def get_transform(train):
     base_size = 520
     crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast)
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, grid_size=args.grid_size)
 
 def criterion(inputs, target):
     losses = {}
@@ -118,6 +119,20 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             output = model(image)
             output = output['out']
 
+            if idx == 1 or idx == 10:
+                image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/image/"
+                target_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/target/"
+                output_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/output/"
+                utils.mkdir(image_path)
+                utils.mkdir(target_path)
+                utils.mkdir(output_path)
+
+                inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+
+                save_image(inv_normalize(image[0], target)[0], image_path + str(idx) + ".png")
+                save_image(target[0].float(), target_path+ str(idx) + ".png")
+                save_image(torch.from_numpy(get_mask(output)).permute(2, 0, 1).float(), output_path+ str(idx) + ".png")
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
             confmat_image.update(target.flatten(), output.argmax(1).flatten())
@@ -126,6 +141,24 @@ def evaluate(model, data_loader, device, num_classes, iterator):
 
             image_mean_iou = list((iu * 100).tolist())
             per_mean_iou.append(image_mean_iou)
+
+            # ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
+            # ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+            # val_image = image[0]
+            # val_target = target[0]
+            # val_output = get_mask(output)
+
+            # ground_image_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/ground_image/" + str(idx) + ".png")
+            # ground_truth_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/ground_truth/" + str(idx) + ".png")
+            # val_image_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/image/" + str(idx) + ".png")
+            # val_target_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/target/" + str(idx) + ".png")
+            # val_output_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/output/" + str(idx) + ".png")
+
+            # save_image(ground_image, ground_image_path)
+            # save_image(ground_truth, ground_truth_path)
+            # save_image(val_image, val_image_path)
+            # save_image(val_target, val_target_path)
+            # save_image(val_output, val_output_path)
 
             if args.use_tensorboard:
                 if idx != -1:
@@ -402,6 +435,7 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--contrast', default=1.0, type=float)
+    parser.add_argument('--grid-size', default=20, type=int)
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output', default='./deeplabv3resnet50', help='path where to save')
     parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)

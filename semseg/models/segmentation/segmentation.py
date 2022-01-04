@@ -45,8 +45,8 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
     if aux:
         return_layers[aux_layer] = 'aux'
     
-    # Remove when running with divnorm
-    backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
+    if 'resnet_divnorm' not in backbone_name:
+        backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
     aux_classifier = None
     if aux:

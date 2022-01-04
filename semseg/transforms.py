@@ -195,3 +195,32 @@ class ColorJitter(object):
                 image = F.adjust_hue(image, hue_factor)
 
         return image, target
+
+
+class ColorJitterGrid(object):
+    def __init__(self, brightness=0, contrast=0, saturation=0, hue=0, grid_size=20):
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+        self.grid_size = grid_size
+
+    def __call__(self, image, target):
+        img_tensor, _ = ToTensor()(image, target)
+
+        img_size = (img_tensor.shape[1], img_tensor.shape[2])
+        portion_size = (self.grid_size, self.grid_size)
+        x1 = random.randint(0, img_size[0]-portion_size[0]-1)
+        y1 = random.randint(0, img_size[1]-portion_size[1]-1)
+        x2, y2 = x1+portion_size[0], y1+portion_size[1]
+        grid = torch.clone(img_tensor[:, x1:x2, y1:y2])
+
+        jitter = ColorJitter(contrast=(self.contrast, self.contrast))
+        grid, _ = jitter(grid, target)
+
+        img_tensor[:, x1:x2, y1:y2] = grid
+
+        from torchvision import transforms
+        image = transforms.ToPILImage()(img_tensor).convert("RGB")
+
+        return image, target
