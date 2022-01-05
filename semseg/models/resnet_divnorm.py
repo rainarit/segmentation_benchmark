@@ -184,8 +184,8 @@ class ResNet_DivNorm(nn.Module):
         self.bn1 = norm_layer(self.inplanes)
 
         self.div1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
-        self.div2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False)
-        self.div3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False)
+        self.div2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
+        self.div3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
 
 
         self.relu = nn.ReLU(inplace=True)

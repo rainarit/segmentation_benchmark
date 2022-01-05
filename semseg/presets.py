@@ -37,7 +37,7 @@ class SegmentationPresetEval:
         self.transforms = T.Compose([
             T.RandomResize(base_size, base_size),
             T.ToTensor(),
-            T.ColorJitter(contrast=(contrast, contrast)),
+            T.ColorJitter(contrast=(1.0, self.contrast)),
             T.Normalize(mean=mean, std=std),
         ])
 

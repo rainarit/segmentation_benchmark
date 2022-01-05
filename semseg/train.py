@@ -1,7 +1,6 @@
 import datetime
 import os
 import time
-from numpy.lib import index_tricks
 import torch
 import torch.utils.data
 import transforms as T
@@ -101,7 +100,7 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, iterator):
+def evaluate(model, data_loader, device, num_classes, iterator, save=True):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -119,7 +118,7 @@ def evaluate(model, data_loader, device, num_classes, iterator):
             output = model(image)
             output = output['out']
 
-            if idx == 1 or idx == 10:
+            if save==True:
                 image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/image/"
                 target_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/target/"
                 output_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/output/"
@@ -304,10 +303,13 @@ def main(args):
         sampler=train_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, drop_last=True)
 
-    data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn)
+    if args.dataloader != '':
+        data_loader_test = torch.load(args.dataloader)
+    else:
+        data_loader_test = torch.utils.data.DataLoader(
+            dataset_test, batch_size=1,
+            sampler=test_sampler, num_workers=args.workers,
+            collate_fn=utils.collate_fn)
 
     model = _load_model(arch_type=args.model, 
                       backbone=args.backbone,
@@ -436,6 +438,7 @@ def get_args_parser(add_help=True):
                         dest='weight_decay')
     parser.add_argument('--contrast', default=1.0, type=float)
     parser.add_argument('--grid-size', default=20, type=int)
+    parser.add_argument('--dataloader', default='', help='path to dataloader')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output', default='./deeplabv3resnet50', help='path where to save')
     parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
