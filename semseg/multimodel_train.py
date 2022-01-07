@@ -46,6 +46,51 @@ g.manual_seed(seed)
 evaluate_step = 0
 train_step = 0
 
+def model_obj(arch_type, backbone, dataloader, pretrained, progress, num_classes, aux_loss, divnorm_fsize, device, distributed, gpu, lr, momentum, weight_decay, resume):
+    model = _load_model(arch_type=arch_type, 
+                      backbone=backbone,
+                      pretrained=pretrained,
+                      progress=progress, 
+                      num_classes=num_classes, 
+                      aux_loss=aux_loss, 
+                      divnorm_fsize=divnorm_fsize)
+
+    model.to(device)
+
+    if distributed:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
+    model_without_ddp = model
+
+    if distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu], find_unused_parameters=True)
+        model_without_ddp = model.module
+
+    params_to_optimize = [
+        {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
+        {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
+    ]
+
+    if args.aux_loss:
+        params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
+        params_to_optimize.append({"params": params, "lr": lr * 10})
+
+    optimizer = torch.optim.SGD(
+        params_to_optimize,
+        lr=args.lr, momentum=momentum, weight_decay=weight_decay)
+
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lambda x: (1 - x / (len(dataloader) * args.epochs)) ** 0.9)
+
+    if resume != '':
+        checkpoint= torch.load(str(resume))
+        model_without_ddp.load_state_dict(checkpoint['model'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+    
+    return model_without_ddp, optimizer, lr_scheduler
+
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
         return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
@@ -100,7 +145,7 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, iterator, save=True):
+def evaluate(model, data_loader, device, num_classes, iterator, output_folder, save=True):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -119,9 +164,9 @@ def evaluate(model, data_loader, device, num_classes, iterator, save=True):
             output = output['out']
 
             if save==True:
-                image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/image/"
-                target_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/target/"
-                output_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/output/"
+                image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder) + "/val/image/"
+                target_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder) + "/val/target/"
+                output_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder) + "/val/output/"
                 utils.mkdir(image_path)
                 utils.mkdir(target_path)
                 utils.mkdir(output_path)
@@ -140,24 +185,6 @@ def evaluate(model, data_loader, device, num_classes, iterator, save=True):
 
             image_mean_iou = list((iu * 100).tolist())
             per_mean_iou.append(image_mean_iou)
-
-            # ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-            # ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-            # val_image = image[0]
-            # val_target = target[0]
-            # val_output = get_mask(output)
-
-            # ground_image_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/ground_image/" + str(idx) + ".png")
-            # ground_truth_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/ground_truth/" + str(idx) + ".png")
-            # val_image_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/image/" + str(idx) + ".png")
-            # val_target_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/target/" + str(idx) + ".png")
-            # val_output_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/output/" + str(idx) + ".png")
-
-            # save_image(ground_image, ground_image_path)
-            # save_image(ground_truth, ground_truth_path)
-            # save_image(val_image, val_image_path)
-            # save_image(val_target, val_target_path)
-            # save_image(val_output, val_output_path)
 
             if args.use_tensorboard:
                 if idx != -1:
@@ -303,74 +330,75 @@ def main(args):
         sampler=train_sampler, num_workers=args.workers,
         collate_fn=utils.collate_fn, drop_last=True)
 
-    if args.dataloader != '':
-        data_loader_test = torch.load(args.dataloader)
-    else:
-        data_loader_test = torch.utils.data.DataLoader(
-            dataset_test, batch_size=1,
-            sampler=test_sampler, num_workers=args.workers,
-            collate_fn=utils.collate_fn)
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test, batch_size=1,
+        sampler=test_sampler, num_workers=args.workers,
+        collate_fn=utils.collate_fn)
 
+    # model_baseline, optimizer_baseline, lr_scheduler_baseline = model_obj(arch_type=args.model, 
+    #                                                                     backbone=args.backbonebaseline, 
+    #                                                                     dataloader=data_loader, 
+    #                                                                     pretrained=False, 
+    #                                                                     progress=True, 
+    #                                                                     num_classes=num_classes, 
+    #                                                                     aux_loss=args.aux_loss, 
+    #                                                                     divnorm_fsize=5, 
+    #                                                                     device=device, 
+    #                                                                     distributed=args.distributed, 
+    #                                                                     gpu=args.gpu, 
+    #                                                                     lr=args.lr, 
+    #                                                                     momentum=args.momentum, 
+    #                                                                     weight_decay=args.weight_decay, 
+    #                                                                     resume=args.resumebaseline)
 
-    model = _load_model(arch_type=args.model, 
-                      backbone=args.backbone,
-                      pretrained=False,
-                      progress=True, 
-                      num_classes=num_classes, 
-                      aux_loss=args.aux_loss, 
-                      divnorm_fsize=5)
+    model_divnormei, optimizer_divnormei, lr_scheduler_divnormei = model_obj(arch_type=args.model, 
+                                                                            backbone=args.backbonedivnormei, 
+                                                                            dataloader=data_loader, 
+                                                                            pretrained=False, 
+                                                                            progress=True, 
+                                                                            num_classes=num_classes, 
+                                                                            aux_loss=args.aux_loss, 
+                                                                            divnorm_fsize=5, 
+                                                                            device=device, 
+                                                                            distributed=args.distributed, 
+                                                                            gpu=args.gpu, 
+                                                                            lr=args.lr, 
+                                                                            momentum=args.momentum, 
+                                                                            weight_decay=args.weight_decay, 
+                                                                            resume=args.resumedivnormei)
     
-    model.to(device)
-
-    if args.distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-
-    model_without_ddp = model
-
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
-        model_without_ddp = model.module
-
-    params_to_optimize = [
-        {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
-        {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
-    ]
-
-    if args.aux_loss:
-        params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
-        params_to_optimize.append({"params": params, "lr": args.lr * 10})
-    
-    optimizer = torch.optim.SGD(
-        params_to_optimize,
-        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
-
     if args.test_only:
 
-        iou_file = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.output) + "_test.csv")
-        iou_image_file = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.output) + "per_image_mean_test.csv")
+        #iou_file_baseline = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputbaseline) + "_test_test.csv")
+        #iou_image_file_baseline = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputbaseline) + "per_image_mean_test.csv")
 
-        if args.resume != '':
-            checkpoint = torch.load(str(args.resume))
-            model_without_ddp.load_state_dict(checkpoint['model'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        iou_file_divnormei = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputdivnormei) + "_test_test.csv")
+        iou_image_file_divornmei = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputdivnormei) + "per_image_mean_test.csv")
         
-        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
-        confmat_iu = confmat.get_IoU()
+        #confmat_baseline, per_image_mean_baseline = evaluate(model_baseline, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, output_folder=args.outputbaseline)
+        #confmat_iu_baseline = confmat_baseline.get_IoU()
 
-        writer=csv.writer(open(iou_file,'w'))
-        print(confmat_iu)
-        writer.writerow([confmat_iu])
+        confmat_divnormei, per_image_mean_divnormei = evaluate(model_divnormei, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, output_folder=args.outputdivnormei)
+        confmat_iu_divnormei = confmat_divnormei.get_IoU()
 
-        writer=csv.writer(open(iou_image_file,'w'))
-        for image_mean_iou in per_image_mean:
-            writer.writerow([image_mean_iou])
+        #writer_baseline=csv.writer(open(iou_file_baseline,'w'))
+        #print("Baseline Model Mean IoU: {}%".format(confmat_iu_baseline))
+        #print(confmat_baseline)
+        #writer_baseline.writerow([confmat_baseline])
 
-        print(confmat)
+        #writer_per_image_mean_baseline=csv.writer(open(iou_image_file_baseline,'w'))
+        #for image_mean_iou in per_image_mean_baseline:
+        #    writer_per_image_mean_baseline.writerow([image_mean_iou])
+
+        writer_divnormei=csv.writer(open(iou_file_divnormei,'w'))
+        print("DivNormEI Model Mean IoU: {}%".format(confmat_iu_divnormei))
+        print(confmat_divnormei)
+        writer_divnormei.writerow([confmat_divnormei])
+        
+        writer_per_image_mean_divnormei=csv.writer(open(iou_image_file_divornmei,'w'))
+        for image_mean_iou in per_image_mean_divnormei:
+            writer_per_image_mean_divnormei.writerow([image_mean_iou])
+
         return
     
     iou_file = str(args.output) + ".csv"
@@ -422,8 +450,11 @@ def get_args_parser(add_help=True):
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
     parser.add_argument('--seed', default=429, type=float, help='seed')
     parser.add_argument('--dataset', default='coco', help='dataset name')
+
     parser.add_argument('--model', default='deeplabv3', help='model')
-    parser.add_argument('--backbone', default='resnet101', help='backbone')
+    parser.add_argument('--backbonebaseline', default='resnet101', help='backbone')
+    parser.add_argument('--backbonedivnormei', default='resnet101', help='backbone')
+
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=8, type=int)
@@ -437,14 +468,21 @@ def get_args_parser(add_help=True):
     parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
+
     parser.add_argument('--contrast', default=1.0, type=float)
     parser.add_argument('--grid-size', default=20, type=int)
-    parser.add_argument('--dataloader', default='', help='path to dataloader')
+    
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output', default='./deeplabv3resnet50', help='path where to save')
+
+    parser.add_argument('--outputbaseline', default='./deeplabv3resnet50', help='path where to save')
+    parser.add_argument('--outputdivnormei', default='./deeplabv3resnet50', help='path where to save')
+
     parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
     parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
-    parser.add_argument('--resume', default='', help='resume from checkpoint')
+
+    parser.add_argument('--resumebaseline', default='', help='resume from checkpoint baseline')
+    parser.add_argument('--resumedivnormei', default='', help='resume from checkpoint divnormei')
+
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument(

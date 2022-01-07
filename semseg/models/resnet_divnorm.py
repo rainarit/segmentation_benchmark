@@ -259,15 +259,15 @@ class ResNet_DivNorm(nn.Module):
 
         x = self.maxpool(x)
 
-        #x = self.div1(x, residual=False, square_act=False, hor_conn=True)
+        x = self.div1(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer1(x)
 
-        #x = self.div2(x, residual=False, square_act=False, hor_conn=True)
+        x = self.div2(x, residual=False, square_act=False, hor_conn=True)
         
         x = self.layer2(x)
 
-        #x = self.div3(x, residual=False, square_act=False, hor_conn=True)
+        x = self.div3(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer3(x)
 

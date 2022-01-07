@@ -31,13 +31,17 @@ class SegmentationPresetTrain:
 
 class SegmentationPresetEval:
     def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, grid_size=20):
+        self.contrast_initial = contrast
         self.contrast = contrast
         self.grid_size = grid_size
+
+        if self.contrast != 1.0:
+            self.contrast_initial=self.contrast-1.0
 
         self.transforms = T.Compose([
             T.RandomResize(base_size, base_size),
             T.ToTensor(),
-            T.ColorJitter(contrast=(1.0, self.contrast)),
+            T.ColorJitter(contrast=(self.contrast_initial, self.contrast)),
             T.Normalize(mean=mean, std=std),
         ])
 
