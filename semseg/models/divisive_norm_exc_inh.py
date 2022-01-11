@@ -243,11 +243,14 @@ class DivNormExcInh(nn.Module):
             simple_cells = nn.Identity()(x)
 
         if square_act:
-            simple_cells = simple_cells ** 2
+            # TODO(vveeraba): vijay removed squaring for NaN debugging
+            # simple_cells = simple_cells ** 2
+            # denominator to be a function of the numerator (fraction of numerator)
+            # Make sure that the self connection is some small non-zero value
             norm = self.div(simple_cells) + self.sigma ** 2 + 1e-5
             if (norm == 0).any():
                 import ipdb; ipdb.set_trace()
-            simple_cells = simple_cells / norm
+            simple_cells = torch.div(simple_cells, norm)
         else:
             norm = 1 + F.relu(self.div(simple_cells))
             simple_cells = simple_cells / norm
