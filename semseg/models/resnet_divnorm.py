@@ -178,7 +178,7 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div = DivNormExcInh(self.inplanes, None, None, None, None, 3)
+        self.div = DivNormExcInh(self.inplanes, None, None, None, None, 5)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -291,7 +291,7 @@ def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
-                   **kwargs)
+                   residual_divnorm, **kwargs)
 
 
 def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
@@ -302,7 +302,7 @@ def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet('resnet34', BasicBlock, [3, 4, 6, 3], pretrained, progress,
-                   **kwargs)
+                   residual_divnorm, **kwargs)
 
 
 def resnet50(pretrained: bool = False, progress: bool = True, residual_divnorm=True, **kwargs: Any) -> ResNet_DivNorm:
@@ -325,7 +325,7 @@ def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
     """
 
     return _resnet('resnet101', Bottleneck, [3, 4, 23, 3], pretrained, progress,
-                   **kwargs)
+                   residual_divnorm, **kwargs)
 
 
 def resnet152(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
@@ -336,7 +336,7 @@ def resnet152(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _resnet('resnet152', Bottleneck, [3, 8, 36, 3], pretrained, progress,
-                   **kwargs)
+                   residual_divnorm, **kwargs)
 
 
 def resnext50_32x4d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
