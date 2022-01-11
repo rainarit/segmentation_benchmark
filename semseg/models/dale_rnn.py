@@ -2,8 +2,6 @@
 import torch  # pylint: disable=import-error
 import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
-import numpy as np
-import math
 
 
 def nonnegative_weights_init(m):
@@ -72,7 +70,6 @@ class DaleRNNcell(nn.Module):
         
     def forward(self, input, hidden):
       # TODO (make symmetric horizontal connections)
-      # TODO (make non-negative horizontal connections)
       exc, inh = hidden
       g_exc = torch.sigmoid(self.ln_e_x(self.g_exc_x(input)) + self.ln_e_e(self.g_exc_e(exc)))
       g_inh = torch.sigmoid(self.ln_i_x(self.g_inh_x(input)) + self.ln_i_i(self.g_inh_i(inh)))
@@ -96,6 +93,7 @@ class DaleRNNLayer(nn.Module):
                inh_fsize=3,
                timesteps=4,
                device='cuda',
+               temporal_agg=True,
                ):
     super(DaleRNNLayer, self).__init__()
     self.in_channels = in_channels
@@ -114,12 +112,20 @@ class DaleRNNLayer(nn.Module):
                             exc_fsize=self.exc_fsize,
                             inh_fsize=self.inh_fsize,
                             device=self.device)
+    if temporal_agg:
+      self.temporal_agg = nn.Conv2d(self.hidden_dim * self.timesteps, self.hidden_dim, 1)
+    else:
+      self.temporal_agg = None
   
   def forward(self, input, state):
     outputs_e = []
     outputs_i = []
-    for i in range(self.timesteps):
+    for _ in range(self.timesteps):
         state = self.rnn_cell(input, state)
         outputs_e += [state[0]]
         outputs_i += [state[1]]
-    return (outputs_e, outputs_i, state)
+    if self.temporal_agg is not None:
+      outputs_e = torch.cat(outputs_e, dim=1)
+      output = self.temporal_agg(outputs_e)
+      return outputs_e, outputs_i, state, output
+    return (outputs_e, outputs_i, state, outputs_e[-1])
