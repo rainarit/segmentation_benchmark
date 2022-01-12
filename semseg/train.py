@@ -177,7 +177,7 @@ def main(args):
 
     device = torch.device(args.device)
 
-    dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(train=True))
+    dataset, num_classes = get_dataset(args.data_path, args.dataset, "train_noval", get_transform(train=True))
 
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
 
