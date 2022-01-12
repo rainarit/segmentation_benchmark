@@ -239,26 +239,28 @@ def main(args):
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
     
     if args.test_only:
+        output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
+        output_val_test_dir = os.path.join(output_dir, "val_test_only/")
+        if not(os.path.isdir(output_dir)):
+            utils.mkdir(output_dir)
+        if not(os.path.isdir(output_val_test_dir)):
+            utils.mkdir(output_val_test_dir)
+        mean_iou_file = os.path.join(output_val_test_dir, "mean_iou.csv")
 
-        iou_file = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.output) + "_test.csv")
-        iou_image_file = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.output) + "per_image_mean_test.csv")
-
-        if args.resume != '':
+        try:
             checkpoint = torch.load(str(args.resume))
             model_without_ddp.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-        
-        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
-        confmat_iu = confmat.get_IoU()
+        except:
+            sys.exit('Error with checkpoint weights file.')
 
-        writer=csv.writer(open(iou_file,'w'))
-        print(confmat_iu)
-        writer.writerow([confmat_iu])
+        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=output_val_test_dir)
+        confmat_iu = confmat.get_IoU()    
 
-        writer=csv.writer(open(iou_image_file,'w'))
-        for image_mean_iou in per_image_mean:
-            writer.writerow([image_mean_iou])
+        with open(mean_iou_file, 'w', newline='') as f:
+            wr = csv.writer(f, quoting=csv.QUOTE_ALL)
+            wr.write([confmat_iu])  
 
         print(confmat)
         return
