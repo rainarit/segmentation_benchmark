@@ -259,23 +259,28 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         # Clamping parameters of divnorm to non-negative values
         if "divnorm" in str(args.backbone):
-            if args.distributed:
-                div_conv_weight = model.module.backbone.div1.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div1.div.weight.data = div_conv_weight
+            for module_name, module in model.named_modules():
+                    if module_name.endswith("div"):
+                        curr_module_weight = module.weight.data
+                        curr_module_weight = curr_module_weight.clamp(min=0.)
+                        module.weight.data = curr_module_weight
+            # if args.distributed:
+            #     div_conv_weight = model.module.backbone.div1.div.weight.data
+            #     div_conv_weight = div_conv_weight.clamp(min=0.)
+            #     model.module.backbone.div1.div.weight.data = div_conv_weight
 
-                div_conv_weight = model.module.backbone.div2.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div2.div.weight.data = div_conv_weight
+            #     div_conv_weight = model.module.backbone.div2.div.weight.data
+            #     div_conv_weight = div_conv_weight.clamp(min=0.)
+            #     model.module.backbone.div2.div.weight.data = div_conv_weight
 
-            else:
-                div_conv_weight = model.module.backbone.div1.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div1.div.weight.data = div_conv_weight
+            # else:
+            #     div_conv_weight = model.module.backbone.div1.div.weight.data
+            #     div_conv_weight = div_conv_weight.clamp(min=0.)
+            #     model.module.backbone.div1.div.weight.data = div_conv_weight
 
-                div_conv_weight = model.module.backbone.div2.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div2.div.weight.data = div_conv_weight
+            #     div_conv_weight = model.module.backbone.div2.div.weight.data
+            #     div_conv_weight = div_conv_weight.clamp(min=0.)
+            #     model.module.backbone.div2.div.weight.data = div_conv_weight
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
