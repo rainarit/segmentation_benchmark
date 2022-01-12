@@ -91,7 +91,6 @@ def evaluate(model, data_loader, device, num_classes, output_dir):
             output = output['out']
 
             inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-            image = inv_normalize(image[0], target)[0]
             
             image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
             target_path = os.path.join(target_dir, '{}.npy'.format(idx))
@@ -116,7 +115,7 @@ def evaluate(model, data_loader, device, num_classes, output_dir):
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('Validation time {}'.format(total_time_str))
     
-    with open(mean_iou_file, 'wb') as f:
+    with open(mean_iou_file, 'w', newline='') as f:
             wr = csv.writer(f, quoting=csv.QUOTE_ALL)
             wr.writerow(per_mean_iou)
 
@@ -134,7 +133,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
     scaler = torch.cuda.amp.GradScaler()
 
     for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        
         image, target = image.to(device), target.to(device)
 
         # Casts operations to mixed precision
@@ -151,14 +149,11 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         # Clamping parameters of divnorm to non-negative values
         if "divnorm" in str(args.backbone):
-            if args.distributed:
-                div_conv_weight = model.module.backbone.div1.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div1.div.weight.data = div_conv_weight
-            else:
-                div_conv_weight = model.module.backbone.div1.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div1.div.weight.data = div_conv_weight
+            for module_name, module in model.named_modules():
+                if module_name.endswith("div"):
+                    curr_module_weight = module.weight.data
+                    curr_module_weight = curr_module_weight.clamp(min=0.)
+                    module.weight.data = curr_module_weight
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -269,9 +264,9 @@ def main(args):
         return
     
     output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
-    output_val_dir = os.path.join(output_dir, "/val/")
-    output_checkpoints_dir = os.path.join(output_dir, "/checkpoints/")
-    output_val_epochs_dir = os.path.join(output_dir, "/val/epochs/")
+    output_val_dir = os.path.join(output_dir, "val/")
+    output_checkpoints_dir = os.path.join(output_dir, "checkpoints/")
+    output_val_epochs_dir = os.path.join(output_dir, "val/epochs/")
     if not(os.path.isdir(output_dir)):
         utils.mkdir(output_dir)
     if not(os.path.isdir(output_val_dir)):
@@ -281,7 +276,7 @@ def main(args):
     if not(os.path.isdir(output_val_epochs_dir)):
         utils.mkdir(output_val_epochs_dir)
     
-    mean_iou_file = os.path.join(output_dir, "/mean_iou.csv")
+    mean_iou_file = os.path.join(output_dir, "mean_iou.csv")
     mean_iou_list = list()
 
     per_image_mean_iou_file = str(args.output) + "_per_image_mean_iou.csv"
@@ -313,7 +308,7 @@ def main(args):
         }
         utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
 
-    with open(mean_iou_file, 'wb') as f:
+    with open(mean_iou_file, 'w', newline='') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)
         wr.writerow(mean_iou_list)
 
