@@ -145,23 +145,38 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, iterator, output_folder, save=True):
-    model.eval()
+def evaluate(model_baseline, model_compare, data_loader, device, num_classes, iterator, output_folder, output_folder_compare, save=True):
+    model_baseline.eval()
+    model_compare.eval()
+
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
 
-    confmat = utils.ConfusionMatrix(num_classes)
-    per_mean_iou = list()
+    confmat_baseline = utils.ConfusionMatrix(num_classes)
+    per_mean_iou_baseline = list()
+
+    confmat_compare = utils.ConfusionMatrix(num_classes)
+    per_mean_iou_compare = list()
 
     with torch.no_grad():
         start_time = time.time()
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
             image, target = image.to(device), target.to(device)
 
-            confmat_image = utils.ConfusionMatrix(num_classes)
+            confmat_image_baseline = utils.ConfusionMatrix(num_classes)
+            confmat_image_compare = utils.ConfusionMatrix(num_classes)
 
-            output = model(image)
-            output = output['out']
+            output_baseline = model_baseline(image)
+            output_baseline = output_baseline['out']
+
+            output_compare = model_compare(image)
+            output_compare = output_compare['out']
+
+            inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+
+            print(inv_normalize(image[0], target).shape)
+
+            break
 
             if save==True:
                 image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder) + "/val/image/"
@@ -175,47 +190,45 @@ def evaluate(model, data_loader, device, num_classes, iterator, output_folder, s
 
                 save_image(inv_normalize(image[0], target)[0], image_path + str(idx) + ".png")
                 save_image(target[0].float(), target_path+ str(idx) + ".png")
-                save_image(torch.from_numpy(get_mask(output)).permute(2, 0, 1).float(), output_path+ str(idx) + ".png")
+                save_image(torch.from_numpy(get_mask(output_baseline)).float(), output_path+ str(idx) + ".png")
 
-            confmat.update(target.flatten(), output.argmax(1).flatten())
+                image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder_compare) + "/val/image/"
+                target_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder_compare) + "/val/target/"
+                output_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(output_folder_compare) + "/val/output/"
+                utils.mkdir(image_path)
+                utils.mkdir(target_path)
+                utils.mkdir(output_path)
 
-            confmat_image.update(target.flatten(), output.argmax(1).flatten())
-            acc_global, acc, iu = confmat_image.compute()
-            confmat_image.reduce_from_all_processes()
+                save_image(inv_normalize(image[0], target)[0], image_path + str(idx) + ".png")
+                save_image(target[0].float(), target_path+ str(idx) + ".png")
+                save_image(torch.from_numpy(get_mask(output_compare)).float(), output_path+ str(idx) + ".png")
 
-            image_mean_iou = list((iu * 100).tolist())
-            per_mean_iou.append(image_mean_iou)
+            confmat_baseline.update(target.flatten(), output_baseline.argmax(1).flatten())
+            confmat_compare.update(target.flatten(), output_compare.argmax(1).flatten())
 
-            if args.use_tensorboard:
-                if idx != -1:
-                    if ".mat" in data_loader.dataset.masks[idx]:
-                        ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+            confmat_image_baseline.update(target.flatten(), output_baseline.argmax(1).flatten())
+            acc_global_baseline, acc_baseline, iu_baseline = confmat_image_baseline.compute()
+            confmat_image_baseline.reduce_from_all_processes()
 
-                        writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                        writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-                    else:
-                        ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
+            image_mean_iou = list((iu_baseline * 100).tolist())
+            per_mean_iou_baseline.append(image_mean_iou)
 
-                        writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                        writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-                    writer.flush()
+            confmat_image_compare.update(target.flatten(), output_compare.argmax(1).flatten())
+            acc_global_compare, acc_compare, iu_compare = confmat_image_compare.compute()
+            confmat_image_compare.reduce_from_all_processes()
+
+            image_mean_iou = list((iu_compare * 100).tolist())
+            per_mean_iou_compare.append(image_mean_iou)
 
             iterator.add_eval()
 
-        confmat.reduce_from_all_processes()
+        confmat_baseline.reduce_from_all_processes()
+        confmat_compare.reduce_from_all_processes()
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('Validation time {}'.format(total_time_str))
-    return confmat, per_mean_iou
+    return confmat_baseline, per_mean_iou_baseline, confmat_compare, per_mean_iou_compare
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, iterator):
 
@@ -332,24 +345,24 @@ def main(args):
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1,
-        sampler=test_sampler, num_workers=args.workers,
+        num_workers=args.workers,
         collate_fn=utils.collate_fn)
 
-    # model_baseline, optimizer_baseline, lr_scheduler_baseline = model_obj(arch_type=args.model, 
-    #                                                                     backbone=args.backbonebaseline, 
-    #                                                                     dataloader=data_loader, 
-    #                                                                     pretrained=False, 
-    #                                                                     progress=True, 
-    #                                                                     num_classes=num_classes, 
-    #                                                                     aux_loss=args.aux_loss, 
-    #                                                                     divnorm_fsize=5, 
-    #                                                                     device=device, 
-    #                                                                     distributed=args.distributed, 
-    #                                                                     gpu=args.gpu, 
-    #                                                                     lr=args.lr, 
-    #                                                                     momentum=args.momentum, 
-    #                                                                     weight_decay=args.weight_decay, 
-    #                                                                     resume=args.resumebaseline)
+    model_baseline, optimizer_baseline, lr_scheduler_baseline = model_obj(arch_type=args.model, 
+                                                                        backbone=args.backbonebaseline, 
+                                                                        dataloader=data_loader, 
+                                                                        pretrained=False, 
+                                                                        progress=True, 
+                                                                        num_classes=num_classes, 
+                                                                        aux_loss=args.aux_loss, 
+                                                                        divnorm_fsize=5, 
+                                                                        device=device, 
+                                                                        distributed=args.distributed, 
+                                                                        gpu=args.gpu, 
+                                                                        lr=args.lr, 
+                                                                        momentum=args.momentum, 
+                                                                        weight_decay=args.weight_decay, 
+                                                                        resume=args.resumebaseline)
 
     model_divnormei, optimizer_divnormei, lr_scheduler_divnormei = model_obj(arch_type=args.model, 
                                                                             backbone=args.backbonedivnormei, 
@@ -369,26 +382,24 @@ def main(args):
     
     if args.test_only:
 
-        #iou_file_baseline = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputbaseline) + "_test_test.csv")
-        #iou_image_file_baseline = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputbaseline) + "per_image_mean_test.csv")
+        iou_file_baseline = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputbaseline) + "_test_test.csv")
+        iou_image_file_baseline = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputbaseline) + "per_image_mean_test.csv")
 
         iou_file_divnormei = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputdivnormei) + "_test_test.csv")
         iou_image_file_divornmei = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.outputdivnormei) + "per_image_mean_test.csv")
         
-        #confmat_baseline, per_image_mean_baseline = evaluate(model_baseline, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, output_folder=args.outputbaseline)
-        #confmat_iu_baseline = confmat_baseline.get_IoU()
-
-        confmat_divnormei, per_image_mean_divnormei = evaluate(model_divnormei, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, output_folder=args.outputdivnormei)
+        confmat_baseline, per_image_mean_baseline, confmat_divnormei, per_image_mean_divnormei = evaluate(model_baseline, model_divnormei, data_loader_test, device=device, num_classes=num_classes, iterator=iterator, output_folder=args.outputbaseline, output_folder_compare=args.outputdivnormei)
+        confmat_iu_baseline = confmat_baseline.get_IoU()
         confmat_iu_divnormei = confmat_divnormei.get_IoU()
 
-        #writer_baseline=csv.writer(open(iou_file_baseline,'w'))
-        #print("Baseline Model Mean IoU: {}%".format(confmat_iu_baseline))
-        #print(confmat_baseline)
-        #writer_baseline.writerow([confmat_baseline])
+        writer_baseline=csv.writer(open(iou_file_baseline,'w'))
+        print("Baseline Model Mean IoU: {}%".format(confmat_iu_baseline))
+        print(confmat_baseline)
+        writer_baseline.writerow([confmat_baseline])
 
-        #writer_per_image_mean_baseline=csv.writer(open(iou_image_file_baseline,'w'))
-        #for image_mean_iou in per_image_mean_baseline:
-        #    writer_per_image_mean_baseline.writerow([image_mean_iou])
+        writer_per_image_mean_baseline=csv.writer(open(iou_image_file_baseline,'w'))
+        for image_mean_iou in per_image_mean_baseline:
+            writer_per_image_mean_baseline.writerow([image_mean_iou])
 
         writer_divnormei=csv.writer(open(iou_file_divnormei,'w'))
         print("DivNormEI Model Mean IoU: {}%".format(confmat_iu_divnormei))

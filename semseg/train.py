@@ -27,24 +27,10 @@ from torchvision.utils import save_image
 import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
-from models.segmentation.segmentation import _load_model
+from models.segmentation.segmentation import _load_model as load_model
 import  csv
 from torchvision.utils import save_image
 
-seed=565
-random.seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
-g = torch.Generator()
-g.manual_seed(seed)
-
-evaluate_step = 0
-train_step = 0
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -63,34 +49,10 @@ def get_dataset(dir_path, name, image_set, transform):
         ds = ds_fn(p, image_set=image_set, transforms=transform, download=False)
     return ds, num_classes
 
-def visTensor(tensor, ch=0, allkernels=False, nrow=8, padding=1): 
-    n,c,w,h = tensor.shape
-
-    if allkernels: 
-        tensor = tensor.view(n*c, -1, w, h)
-    elif c != 3: 
-        tensor = tensor[:,ch,:,:].unsqueeze(dim=1)
-
-    rows = np.min((tensor.shape[0] // nrow + 1, 64))    
-    grid = torch_utils.make_grid(tensor, nrow=nrow, normalize=True, padding=2, pad_value=1.0)
-    img = grid.numpy().transpose((1, 2, 0))
-    return img
-
-def get_mask(output):
-    output_predictions = output[0].argmax(0)
-    # create a color pallette, selecting a color for each class
-    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-    colors = (colors % 255).numpy().astype("uint8")
-    # plot the semantic segmentation predictions of 21 classes in each color
-    r = Image.fromarray(output_predictions.byte().cpu().numpy())
-    r.putpalette(colors)
-    return np.array(r.convert('RGB'))
-
 def get_transform(train):
     base_size = 520
     crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, grid_size=args.grid_size)
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast)
 
 def criterion(inputs, target):
     losses = {}
@@ -100,13 +62,23 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, iterator, save=True):
+def evaluate(model, data_loader, device, num_classes, output_dir):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
 
     confmat = utils.ConfusionMatrix(num_classes)
     per_mean_iou = list()
+
+    image_epoch_dir = os.path.join(output_dir, "images/")
+    utils.mkdir(image_epoch_dir)
+    image_dir = os.path.join(output_dir, "images/image/")
+    utils.mkdir(image_dir)
+    target_dir = os.path.join(output_dir, "images/target/")
+    utils.mkdir(target_dir)
+    prediction_dir = os.path.join(output_dir, "images/prediction/")
+    utils.mkdir(prediction_dir)
+    mean_iou_file = os.path.join(output_dir, "per_image_mean_iou.csv")
 
     with torch.no_grad():
         start_time = time.time()
@@ -118,19 +90,16 @@ def evaluate(model, data_loader, device, num_classes, iterator, save=True):
             output = model(image)
             output = output['out']
 
-            if save==True:
-                image_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/image/"
-                target_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/target/"
-                output_path = '/home/AD/rraina/segmentation_benchmark/semseg/images/' + str(args.output) + "/val/output/"
-                utils.mkdir(image_path)
-                utils.mkdir(target_path)
-                utils.mkdir(output_path)
+            inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+            image = inv_normalize(image[0], target)[0]
+            
+            image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
+            target_path = os.path.join(target_dir, '{}.npy'.format(idx))
+            prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
 
-                inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-
-                save_image(inv_normalize(image[0], target)[0], image_path + str(idx) + ".png")
-                save_image(target[0].float(), target_path+ str(idx) + ".png")
-                save_image(torch.from_numpy(get_mask(output)).permute(2, 0, 1).float(), output_path+ str(idx) + ".png")
+            utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
+            utils.save_on_master(target, target_path)
+            utils.save_on_master(output, prediction_path)
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
@@ -141,56 +110,19 @@ def evaluate(model, data_loader, device, num_classes, iterator, save=True):
             image_mean_iou = list((iu * 100).tolist())
             per_mean_iou.append(image_mean_iou)
 
-            # ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-            # ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-            # val_image = image[0]
-            # val_target = target[0]
-            # val_output = get_mask(output)
-
-            # ground_image_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/ground_image/" + str(idx) + ".png")
-            # ground_truth_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/ground_truth/" + str(idx) + ".png")
-            # val_image_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/image/" + str(idx) + ".png")
-            # val_target_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/target/" + str(idx) + ".png")
-            # val_output_path = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/images/', str(args.output) + "/val/output/" + str(idx) + ".png")
-
-            # save_image(ground_image, ground_image_path)
-            # save_image(ground_truth, ground_truth_path)
-            # save_image(val_image, val_image_path)
-            # save_image(val_target, val_target_path)
-            # save_image(val_output, val_output_path)
-
-            if args.use_tensorboard:
-                if idx != -1:
-                    if ".mat" in data_loader.dataset.masks[idx]:
-                        ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                        writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                        writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-                    else:
-                        ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                        ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-
-                        writer.add_image('Images/val_ground_image', ground_image, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_ground_truth', ground_truth, iterator.eval_step, dataformats='HWC')
-                        writer.add_image('Images/val_image', image[0], iterator.eval_step, dataformats='CHW')
-                        writer.add_image('Images/val_target', target[0], iterator.eval_step, dataformats='HW')
-                        writer.add_image('Images/val_output', get_mask(output), iterator.eval_step, dataformats='HWC')
-                    writer.flush()
-
-            iterator.add_eval()
-
         confmat.reduce_from_all_processes()
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('Validation time {}'.format(total_time_str))
-    return confmat, per_mean_iou
+    
+    with open(mean_iou_file, 'wb') as f:
+            wr = csv.writer(f, quoting=csv.QUOTE_ALL)
+            wr.writerow(per_mean_iou)
 
-def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, iterator):
+    return confmat
+
+def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
 
     model.train()
 
@@ -223,67 +155,30 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
                 div_conv_weight = model.module.backbone.div1.div.weight.data
                 div_conv_weight = div_conv_weight.clamp(min=0.)
                 model.module.backbone.div1.div.weight.data = div_conv_weight
-
-                div_conv_weight = model.module.backbone.div2.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div2.div.weight.data = div_conv_weight
-
             else:
                 div_conv_weight = model.module.backbone.div1.div.weight.data
                 div_conv_weight = div_conv_weight.clamp(min=0.)
                 model.module.backbone.div1.div.weight.data = div_conv_weight
 
-                div_conv_weight = model.module.backbone.div2.div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.module.backbone.div2.div.weight.data = div_conv_weight
-
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
-        confmat_train = utils.ConfusionMatrix(21)
-        confmat_train.update(target.flatten(), output['out'].argmax(1).flatten())
-        confmat_train_acc_global, confmat_train_acc, confmat_train_iu = confmat_train.compute()
-
-        if args.use_tensorboard:
-            if idx % 10 == 0:
-                if ".mat" in data_loader.dataset.masks[idx]:
-                    ground_truth = torch.from_numpy(scipy.io.loadmat(data_loader.dataset.masks[idx])['GTcls'][0][0][1])
-                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-                    writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-                    writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HW')
-                    writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-                    writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-                    writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
-                else:
-                    ground_truth = torch.from_numpy(mpimg.imread(data_loader.dataset.masks[idx]))
-                    ground_image = torch.from_numpy(mpimg.imread(data_loader.dataset.images[idx]))
-                    writer.add_image('Images/train_ground_image', ground_image, iterator.train_step, dataformats='HWC')
-                    writer.add_image('Images/train_ground_truth', ground_truth, iterator.train_step, dataformats='HWC')
-                    writer.add_image('Images/train_image', image[0], iterator.train_step, dataformats='CHW')
-                    writer.add_image('Images/train_target', target[0], iterator.train_step, dataformats='HW')
-                    writer.add_image('Images/train_output', get_mask(output['out']), iterator.train_step, dataformats='HWC')
-
-            writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-            writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
-            writer.add_scalar("Mean IoU/train", confmat_train_iu.mean().item() * 100, iterator.train_step)
-            writer.add_scalar("Pixel Accuracy/train", confmat_train_acc_global.item() * 100, iterator.train_step)
-            writer.flush()
-
-        iterator.add_train()
-
-    confmat_train.reduce_from_all_processes()
-
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
-
 def main(args):
+
+    seed=args.seed
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    g = torch.Generator()
+    g.manual_seed(seed)
 
     utils.init_distributed_mode(args)
 
     print(args)
-
-    iterator = utils.Iterator()
 
     device = torch.device(args.device)
 
@@ -298,27 +193,27 @@ def main(args):
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn, drop_last=True)
+    data_loader = torch.utils.data.DataLoader(dataset, 
+        batch_size=args.batch_size, 
+        sampler=train_sampler, 
+        num_workers=args.workers, 
+        collate_fn=utils.collate_fn, 
+        drop_last=True)
 
-    if args.dataloader != '':
-        data_loader_test = torch.load(args.dataloader)
-    else:
-        data_loader_test = torch.utils.data.DataLoader(
-            dataset_test, batch_size=1,
-            sampler=test_sampler, num_workers=args.workers,
-            collate_fn=utils.collate_fn)
+    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
+        batch_size=1, 
+        sampler=test_sampler, 
+        num_workers=args.workers, 
+        collate_fn=utils.collate_fn)
 
 
-    model = _load_model(arch_type=args.model, 
-                      backbone=args.backbone,
-                      pretrained=False,
-                      progress=True, 
-                      num_classes=num_classes, 
-                      aux_loss=args.aux_loss, 
-                      divnorm_fsize=5)
+    model = load_model(arch_type=args.model, 
+                       backbone=args.backbone,
+                       pretrained=False,
+                       progress=True, 
+                       num_classes=num_classes, 
+                       aux_loss=args.aux_loss, 
+                       divnorm_fsize=5)
     
     model.to(device)
 
@@ -347,7 +242,7 @@ def main(args):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
-
+    
     if args.test_only:
 
         iou_file = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/csv/', str(args.output) + "_test.csv")
@@ -359,7 +254,7 @@ def main(args):
             optimizer.load_state_dict(checkpoint['optimizer'])
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
         
-        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
+        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         confmat_iu = confmat.get_IoU()
 
         writer=csv.writer(open(iou_file,'w'))
@@ -373,34 +268,41 @@ def main(args):
         print(confmat)
         return
     
-    iou_file = str(args.output) + ".csv"
-    iou_image_file = str(args.output) + "per_image_mean.csv"
-
-    start_time = time.time()
-
-    mean_iou_list = list()
-
     output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
+    output_val_dir = os.path.join(output_dir, "/val/")
+    output_checkpoints_dir = os.path.join(output_dir, "/checkpoints/")
+    output_val_epochs_dir = os.path.join(output_dir, "/val/epochs/")
     if not(os.path.isdir(output_dir)):
         utils.mkdir(output_dir)
+    if not(os.path.isdir(output_val_dir)):
+        utils.mkdir(output_val_dir)
+    if not(os.path.isdir(output_checkpoints_dir)):
+        utils.mkdir(output_checkpoints_dir)
+    if not(os.path.isdir(output_val_epochs_dir)):
+        utils.mkdir(output_val_epochs_dir)
+    
+    mean_iou_file = os.path.join(output_dir, "/mean_iou.csv")
+    mean_iou_list = list()
+
+    per_image_mean_iou_file = str(args.output) + "_per_image_mean_iou.csv"
+
+    start_time = time.time()
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         
-        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, iterator)
+        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
 
-        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes, iterator=iterator)
+        epoch_dir = os.path.join(output_val_epochs_dir, "epoch_{}/".format(epoch))
+        utils.mkdir(epoch_dir)
+
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir)
         print(confmat)
 
         confmat_iu = confmat.get_IoU()
-        mean_iou_list.append(confmat_iu)
         confmat_acc_global = confmat.get_acc_global_correct()
-
-        if args.use_tensorboard:
-                    writer.add_scalar("Mean IoU/val", confmat_iu, epoch)
-                    writer.add_scalar("Pixel Accuracy/val", confmat_acc_global, epoch)
-                    writer.flush()
+        mean_iou_list.append(confmat_iu)
 
         checkpoint = {
                     'model': model_without_ddp.state_dict(),
@@ -409,7 +311,11 @@ def main(args):
                     'epoch': epoch,
                     'args': args
         }
-        utils.save_on_master(checkpoint, os.path.join(output_dir, 'checkpoint_{}.pth'.format(epoch)))
+        utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
+
+    with open(mean_iou_file, 'wb') as f:
+        wr = csv.writer(f, quoting=csv.QUOTE_ALL)
+        wr.writerow(mean_iou_list)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -438,12 +344,8 @@ def get_args_parser(add_help=True):
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--contrast', default=1.0, type=float)
-    parser.add_argument('--grid-size', default=20, type=int)
-    parser.add_argument('--dataloader', default='', help='path to dataloader')
     parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
     parser.add_argument('--output', default='./deeplabv3resnet50', help='path where to save')
-    parser.add_argument('--use-tensorboard', dest="use_tensorboard", help="Flag to use tensorboard", action="store_true",)
-    parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -468,6 +370,4 @@ def get_args_parser(add_help=True):
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()
-    if args.use_tensorboard:
-        writer = SummaryWriter(str(args.tensorboard_dir))
     main(args)

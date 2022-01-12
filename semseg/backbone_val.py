@@ -22,7 +22,7 @@ import torchvision.models as models
 
 from torch.utils.tensorboard import SummaryWriter
 
-import models.resnet_divnorm as models_resnet_divnorm
+import semseg.models.resnet_divnormei as models_resnet_divnorm
 import utils
 
 random.seed(0)

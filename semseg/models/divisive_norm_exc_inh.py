@@ -398,23 +398,3 @@ class GaborFilters(nn.Module):
 
 
         return res
-
-class ComplexCell(nn.Module):
-
-    def __init__(self, in_channels):
-        super(ComplexCell, self).__init__()
-        self.in_channels = in_channels
-        self.gfb = GaborFilterBank(in_channels=self.in_channels, l_filter_size=16,
-                                       l_theta=15, l_sfs=2, l_phase=3, stride=4,
-                                       padding_mode='zeros',
-                                       contrast=1.).to('cuda')
-
-    
-    def forward(self, x):
-        r1 = self.gfb(x)
-
-        summation = r1
-
-        return summation
-        
-        
