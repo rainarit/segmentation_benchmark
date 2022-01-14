@@ -62,7 +62,7 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, output_dir):
+def evaluate(model, data_loader, device, num_classes, output_dir, save=True):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -78,7 +78,8 @@ def evaluate(model, data_loader, device, num_classes, output_dir):
     utils.mkdir(target_dir)
     prediction_dir = os.path.join(output_dir, "images/prediction/")
     utils.mkdir(prediction_dir)
-    mean_iou_file = os.path.join(output_dir, "per_image_mean_iou.csv")
+    mean_iou_file = os.path.join(output_dir, "mean_iou.csv")
+    per_mean_iou_file = os.path.join(output_dir, "per_image_mean_iou.csv")
 
     with torch.no_grad():
         start_time = time.time()
@@ -90,15 +91,16 @@ def evaluate(model, data_loader, device, num_classes, output_dir):
             output = model(image)
             output = output['out']
 
-            inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-            
-            image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
-            target_path = os.path.join(target_dir, '{}.npy'.format(idx))
-            prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
+            if save:
+                inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+                
+                image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
+                target_path = os.path.join(target_dir, '{}.npy'.format(idx))
+                prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
 
-            utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
-            utils.save_on_master(target, target_path)
-            utils.save_on_master(output, prediction_path)
+                utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
+                utils.save_on_master(target, target_path)
+                utils.save_on_master(output, prediction_path)
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
@@ -115,10 +117,12 @@ def evaluate(model, data_loader, device, num_classes, output_dir):
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('Validation time {}'.format(total_time_str))
     
-    with open(mean_iou_file, 'w', newline='') as f:
+    with open(per_mean_iou_file, 'w', newline='') as f:
             wr = csv.writer(f, quoting=csv.QUOTE_ALL)
             wr.writerow(per_mean_iou)
-
+    with open(mean_iou_file, 'w', newline='') as f:
+            wr = csv.writer(f, quoting=csv.QUOTE_ALL)
+            wr.writerow([confmat.get_IoU()])
     return confmat
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
@@ -145,15 +149,16 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         scaler.step(optimizer)
         scaler.update()
 
-        lr_scheduler.step()
-
         # Clamping parameters of divnorm to non-negative values
         if "divnorm" in str(args.backbone):
             for module_name, module in model.named_modules():
-                if module_name.endswith("div"):
+                if module_name.endswith("div.div"):
+                    print(module_name)
                     curr_module_weight = module.weight.data
                     curr_module_weight = curr_module_weight.clamp(min=0.)
                     module.weight.data = curr_module_weight
+
+        lr_scheduler.step()
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -172,6 +177,7 @@ def main(args):
     g.manual_seed(seed)
 
     utils.init_distributed_mode(args)
+    args.distributed=False
 
     print(args)
 
@@ -286,29 +292,37 @@ def main(args):
     start_time = time.time()
 
     for epoch in range(args.start_epoch, args.epochs):
+
         if args.distributed:
             train_sampler.set_epoch(epoch)
         
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
+        
+        if args.epochs-epoch <= 10:
+            save=True
+        else:
+            save=False
 
-        epoch_dir = os.path.join(output_val_epochs_dir, "epoch_{}/".format(epoch))
-        utils.mkdir(epoch_dir)
-
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir)
-        print(confmat)
-
-        confmat_iu = confmat.get_IoU()
-        confmat_acc_global = confmat.get_acc_global_correct()
-        mean_iou_list.append(confmat_iu)
-
-        checkpoint = {
+        if save:
+            checkpoint = {
                     'model': model_without_ddp.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'epoch': epoch,
                     'args': args
-        }
-        utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
+            }
+            
+            utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
+
+        epoch_dir = os.path.join(output_val_epochs_dir, "epoch_{}/".format(epoch))
+        utils.mkdir(epoch_dir)
+
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir, save=save)
+        print(confmat)
+
+        confmat_iu = confmat.get_IoU()
+        confmat_acc_global = confmat.get_acc_global_correct()
+        mean_iou_list.append(confmat_iu)
 
     with open(mean_iou_file, 'w', newline='') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)

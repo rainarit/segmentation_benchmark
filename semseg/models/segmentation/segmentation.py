@@ -1,7 +1,6 @@
 from .._utils import IntermediateLayerGetter
 from ..utils import load_state_dict_from_url
 from .. import resnet
-from .. import resnet_divnormei
 from .. import resnet_divnorm
 
 
@@ -24,15 +23,17 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
     if 'divnorm' in backbone_name:
         back_name = backbone_name.split("_divnorm")[0]
         if 'ei' in backbone_name:
-            backbone = resnet_divnormei.__dict__[back_name](
+            backbone = resnet_divnorm.__dict__[back_name](
             pretrained=pretrained_backbone,
             replace_stride_with_dilation=[False, True, True], 
-            divnorm_fsize=divnorm_fsize)
+            divnorm_fsize=divnorm_fsize, 
+            use_exc_inh=True)
         else:
             backbone = resnet_divnorm.__dict__[back_name](
             pretrained=pretrained_backbone,
             replace_stride_with_dilation=[False, True, True], 
-            divnorm_fsize=divnorm_fsize)
+            divnorm_fsize=divnorm_fsize, 
+            use_exc_inh=False)
         out_layer = 'layer4'
         out_inplanes = 2048
         aux_layer = 'layer3'

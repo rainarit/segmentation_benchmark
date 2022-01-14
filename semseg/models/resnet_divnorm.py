@@ -6,6 +6,7 @@ from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
 from .divisive_norm_exc_inh import *
 from .divisive_norm import *
+
 torch.autograd.set_detect_anomaly(True)
 
 from tqdm import tqdm
@@ -161,12 +162,16 @@ class ResNet_DivNorm(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         residual_divnorm: bool = True,
         divnorm_fsize: int = 7,
+        use_exc_inh: bool = True,
     ) -> None:
         super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
+
         self.residual_divnorm = residual_divnorm
+        self.use_exc_inh = use_exc_inh
+
         self.divnorm_fsize = divnorm_fsize
         self.inplanes = 64
         self.dilation = 1
@@ -183,10 +188,12 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        self.div1 = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
-        self.div2 = DivNormExcInh(256, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
-        self.div3 = DivNormExcInh(512, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
-
+        if  self.use_exc_inh:
+            print("-- Using Exc+Inh")
+            self.div = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
+        else:
+            print("-- Not Using Exc+Inh")
+            self.div = DivNorm(64, divnorm_fsize=self.divnorm_fsize, groups=1)
 
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -245,7 +252,7 @@ class ResNet_DivNorm(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor, use_bn1=True) -> Tensor:
+    def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
         return_dict = {}
 
@@ -255,19 +262,16 @@ class ResNet_DivNorm(nn.Module):
         
         x = self.relu(x)
 
-        x = self.div1(x, residual=False, square_act=False, hor_conn=True)
+        if  self.use_exc_inh:
+            x = self.div(x, residual=False, square_act=True, hor_conn=True)
+        else:
+            x = self.div(x, residual=False, square_act=True)
 
         x = self.maxpool(x)
 
-        x = self.div1(x, residual=False, square_act=False, hor_conn=True)
-
         x = self.layer1(x)
-
-        #x = self.div2(x, residual=False, square_act=False, hor_conn=True)
         
         x = self.layer2(x)
-
-        #x = self.div3(x, residual=False, square_act=False, hor_conn=True)
 
         x = self.layer3(x)
 
@@ -291,9 +295,10 @@ def _resnet(
     pretrained: bool,
     progress: bool,
     divnorm_fsize: int,
+    use_exc_inh: True,
     **kwargs: Any
 ) -> ResNet_DivNorm:
-    model = ResNet_DivNorm(block, layers, divnorm_fsize=divnorm_fsize, **kwargs)
+    model = ResNet_DivNorm(block, layers, divnorm_fsize=divnorm_fsize, use_exc_inh=use_exc_inh, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -325,14 +330,14 @@ def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet50(pretrained: bool = False, progress: bool = True, divnorm_fsize: int = 5, **kwargs: Any) -> ResNet_DivNorm:
+def resnet50(pretrained: bool = False, progress: bool = True, divnorm_fsize: int = 7, use_exc_inh: bool = True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress, divnorm_fsize=divnorm_fsize,
+    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress, divnorm_fsize=divnorm_fsize, use_exc_inh = use_exc_inh,
                    **kwargs)
 
 
