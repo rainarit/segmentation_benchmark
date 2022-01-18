@@ -7,7 +7,6 @@ import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
 from numpy.core.numeric import True_
 
-
 class DivNorm(nn.Module):
     """
     Implements Schwartz and Simoncelli 2001 style divisive normalization.
