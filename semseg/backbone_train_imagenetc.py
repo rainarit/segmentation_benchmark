@@ -5,6 +5,7 @@ import shutil
 import time
 import warnings
 from enum import Enum
+import csv
 
 import torch
 import torch.nn as nn
@@ -28,6 +29,7 @@ parser.add_argument('--train_data', metavar='TRAIN_DIR',
                     help='path to training dataset')
 parser.add_argument('--val_data', metavar='VAL_DIR',
                     help='path to validation dataset')
+parser.add_argument('--output', default='resnet50')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -176,6 +178,9 @@ def main_worker(gpu, ngpus_per_node, args):
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
+    
+    output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
+    os.mkdir(output_dir)
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -232,12 +237,27 @@ def main_worker(gpu, ngpus_per_node, args):
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=args.batch_size, shuffle=False,
+        batch_size=1, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
         print('Evaluating:')
-        validate(val_loader, model, criterion, args)
+        eval_dir = os.path.join(output_dir, 'eval')
+        os.mkdir(eval_dir)
+
+        top1_avg, top5_avg = validate(val_loader, model, criterion, args)
+
+        acc_csv = os.path.join(eval_dir, args.output.join('_acc.csv'))
+        with open(acc_csv, "w") as file:
+            writer = csv.writer(file, delimiter=',')
+            writer.writerow([float(top1_avg), float(top5_avg)])
+
+        save_checkpoint({
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'acc1': top1_avg,
+                'acc5': top5_avg,
+            }, is_best=False, filename=os.path.join(eval_dir, 'checkpoint.pth.tar'))
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -353,8 +373,7 @@ def validate(val_loader, model, criterion, args):
 
         progress.display_summary()
 
-    return top1.avg
-
+    return top1.avg, top5.avg
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)

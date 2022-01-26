@@ -62,7 +62,7 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, output_dir, save=True):
+def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -141,6 +141,15 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
 
         # Casts operations to mixed precision
         optimizer.zero_grad()
+
+        # Clamping parameters of divnorm to non-negative values
+        if "divnorm" in str(args.backbone):
+            for module_name, module in model.named_modules():
+                if module_name.endswith("div.div"):
+                    curr_module_weight = module.weight.data
+                    curr_module_weight = curr_module_weight.clamp(min=0.)
+                    module.weight.data = curr_module_weight
+
         with torch.cuda.amp.autocast():
             output = model(image)
             loss = criterion(output, target)
@@ -149,16 +158,8 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         scaler.step(optimizer)
         scaler.update()
 
-        # Clamping parameters of divnorm to non-negative values
-        if "divnorm" in str(args.backbone):
-            for module_name, module in model.named_modules():
-                if module_name.endswith("div.div"):
-                    print(module_name)
-                    curr_module_weight = module.weight.data
-                    curr_module_weight = curr_module_weight.clamp(min=0.)
-                    module.weight.data = curr_module_weight
-
         lr_scheduler.step()
+
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -178,6 +179,8 @@ def main(args):
 
     utils.init_distributed_mode(args)
     args.distributed=False
+
+    current_miou = 0.0
 
     print(args)
 
@@ -297,32 +300,40 @@ def main(args):
             train_sampler.set_epoch(epoch)
         
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
-        
-        if args.epochs-epoch <= 10:
-            save=True
-        else:
-            save=False
-
-        if save:
-            checkpoint = {
-                    'model': model_without_ddp.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': lr_scheduler.state_dict(),
-                    'epoch': epoch,
-                    'args': args
-            }
-            
-            utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
 
         epoch_dir = os.path.join(output_val_epochs_dir, "epoch_{}/".format(epoch))
         utils.mkdir(epoch_dir)
-
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir, save=save)
+    
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir)
         print(confmat)
 
         confmat_iu = confmat.get_IoU()
         confmat_acc_global = confmat.get_acc_global_correct()
         mean_iou_list.append(confmat_iu)
+
+        if float(confmat_iu) > current_miou:
+            checkpoint = {
+                    'model': model_without_ddp.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),
+                    'epoch': epoch,
+                    'args': args,
+                    'miou': float(confmat_iu)
+            }
+            utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'best_checkpoint.pth'))
+
+        if args.epochs-epoch <= 10:
+            checkpoint = {
+                    'model': model_without_ddp.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),
+                    'epoch': epoch,
+                    'args': args,
+                    'miou': float(confmat_iu)
+            }
+            
+            utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
+
 
     with open(mean_iou_file, 'w', newline='') as f:
         wr = csv.writer(f, quoting=csv.QUOTE_ALL)

@@ -32,17 +32,16 @@ class DivNorm(nn.Module):
                  groups=1,
                  ):
         super(DivNorm, self).__init__()
-        self.in_channels = in_channels    
+        self.in_channels = in_channels   
         self.hidden_dim = in_channels
-
         self.div = nn.Conv2d(
-            self.hidden_dim,
-            self.hidden_dim,
-            divnorm_fsize,
-            padding=(divnorm_fsize - 1) // 2,
-            padding_mode=padding_mode,
-            groups=groups,
-            bias=False)
+                self.hidden_dim,
+                self.hidden_dim,
+                divnorm_fsize,
+                padding=(divnorm_fsize - 1) // 2,
+                padding_mode=padding_mode,
+                groups=groups,
+                bias=False)
         if exc_lesion:
             self.e_e = None
         else:
@@ -78,6 +77,7 @@ class DivNorm(nn.Module):
           output: Output post divisive normalization
         """
         identity = x
+
         simple_cells = nn.Identity()(x)
 
         if square_act:
@@ -90,16 +90,10 @@ class DivNorm(nn.Module):
             norm = 1 + F.relu(self.div(simple_cells))
             #norm = F.relu(self.div(simple_cells)) + self.sigma ** 2 + 1e-5
             simple_cells = simple_cells / norm
-        output = simple_cells
-        if self.i_e is not None:
-            inhibition = self.i_e(simple_cells)
-            output = output - inhibition
-        if self.e_e is not None:                
-            # Excitatory lateral connections (Center corresponds to self-excitation)
-            excitation = self.e_e(simple_cells)
-            output = output + excitation
-        output = self.output_bn(output)
+
+        output = self.output_bn(simple_cells)
+
         if residual:
             output += identity
-        output = self.output_relu(output)
+            
         return output

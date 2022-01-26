@@ -4,8 +4,8 @@ from torch import Tensor
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
-from .divisive_norm_exc_inh import *
-from .divisive_norm import *
+from .divisive_norm_exc_inh import DivNormExcInh as DivNormEI
+from .divisive_norm import DivNorm
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -190,7 +190,7 @@ class ResNet_DivNorm(nn.Module):
 
         if  self.use_exc_inh:
             print("-- Using Exc+Inh")
-            self.div = DivNormExcInh(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
+            self.div = DivNormEI(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
         else:
             print("-- Not Using Exc+Inh")
             self.div = DivNorm(64, divnorm_fsize=self.divnorm_fsize, groups=1)
