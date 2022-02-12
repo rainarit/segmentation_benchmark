@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Union, List, Dict, Any, cast
-from .divisive_norm_exc_inh import *
+from .divisive_norm import *
 
 __all__ = [
     'VGG', 'vgg9_divnorm', 'vgg9_base', 'vgg9_divnorm_mini',
@@ -76,7 +76,7 @@ def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequ
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         elif v == 'D':
-            layers += [DivNormExcInh(in_channels, None, None, None, None, 5)]
+            layers += [DivNorm(in_channels, exc_lesion = False, inh_lesion = False)]
         else:
             v = cast(int, v)
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
