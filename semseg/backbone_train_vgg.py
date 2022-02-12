@@ -6,13 +6,9 @@ import sys
 import string
 import time
 import warnings
-<<<<<<< HEAD:semseg/backbone_val.py
-import numpy as np
-=======
 import math
 import numpy as np
 import json
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
 import torch
 from pathlib import Path
@@ -31,21 +27,12 @@ import torchvision.models as models
 
 from torch.utils.tensorboard import SummaryWriter
 
-<<<<<<< HEAD:semseg/backbone_val.py
-import semseg.models.resnet_divnormei as models_resnet_divnorm
-import utils
-
-random.seed(0)
-np.random.seed(0)
-torch.manual_seed(0)
-=======
 import models.vgg as models_vgg
 import utils
 
 seed = 56
 np.random.seed(seed)
 torch.manual_seed(seed)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -251,7 +238,7 @@ def main_worker(gpu, ngpus_per_node, args):
             model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
+    criterion = nn.CrossEntropyLoss()#.cuda(args.gpu)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -327,36 +314,11 @@ def main_worker(gpu, ngpus_per_node, args):
                                 optimizer=optimizer.state_dict())
                     torch.save(state, '%s/checkpoint_%s.pth' % (args.checkpoint_dir, str(args.arch)))
         # train for one epoch
-<<<<<<< HEAD:semseg/backbone_val.py
-        acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator)
-
-        # remember best acc@1 and save checkpoint
-        is_best = acc1 > best_acc1
-        best_acc1 = max(acc1, best_acc1)
-
-        writer.add_scalar("Train/Best_Acc1", best_acc1, epoch)
-        state = {
-                    'epoch': epoch + 1,
-                    'arch': args.arch,
-                    'state_dict': model.state_dict(),
-                    'best_acc1_train': best_acc1,
-                    'optimizer' : optimizer.state_dict(),
-                }
-        if epoch > (args.epochs - 10):
-            # store only last ten epoch weights
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                    and args.rank % ngpus_per_node == 0):
-                save_checkpoint(state, is_best)
-        else:
-            torch.save(state, "checkpoint_%s.pth" % args.arch)
-
-=======
         acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer=None, iterator=iterator)
         val_acc1, val_acc5 = validate(val_loader, model, criterion, optimizer, epoch, args)
         # remember best acc@1 and save checkpoint
         is_best = val_acc1 > best_acc1
         best_acc1 = max(val_acc1, best_acc1)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
         
         stats = dict(epoch=epoch,
                     lr_weights=optimizer.param_groups[0]['lr'],
@@ -430,10 +392,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         with torch.cuda.amp.autocast():
             output = model(images)
             loss = criterion(output, target)
-<<<<<<< HEAD:semseg/backbone_val.py
-            if torch.isnan(loss):
-                print(output.min(), output.max(), target.min(), target.max(), loss)
-=======
             # RELEASE below lines for no nan loss training
             # loss = criterion(output.float(), target)
             
@@ -442,7 +400,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         #     print(output.min(), output.max(), 
         #           target.min(), target.max(), 
         #           loss)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -454,21 +411,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         scaler.step(optimizer)
         scaler.update()
         
-<<<<<<< HEAD:semseg/backbone_val.py
-        # if args.rank == 0:
-        #     # Clamping parameters of divnorm to non-negative values
-        #     for p in model.module.backbone.div.parameters():
-        #         if 'conv' in p:
-        #             import ipdb; ipdb.set_trace()
-        #             p.clamp(min=0.)
-=======
         if args.rank == 0:
             # Clamping parameters of divnorm to non-negative values
             if "divnorm" in str(args.arch):
                 div_conv_weight = model.features[2].div.weight.data
                 div_conv_weight = div_conv_weight.clamp(min=0.)
                 model.features[2].div.weight.data = div_conv_weight
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -476,13 +424,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
 
         if i % args.print_freq == 0:
             if args.rank == 0:
-<<<<<<< HEAD:semseg/backbone_val.py
-                progress.display(i)
-
-        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
-        writer.flush()
-=======
                 stats = dict(epoch=epoch, step=i,
                             lr_weights=optimizer.param_groups[0]['lr'],
                             loss=loss.item(),
@@ -493,7 +434,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         # writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
         # writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
         # writer.flush()
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
         iterator.add_train()
     return top1.avg
@@ -519,16 +459,8 @@ def validate(val_loader, model, criterion, optimizer, epoch, args):
             if torch.cuda.is_available():
                 target = target.cuda(args.gpu, non_blocking=True)
 
-<<<<<<< HEAD:semseg/backbone_val.py
-
-            # Casts operations to mixed precision
-            with torch.cuda.amp.autocast():
-                output = model(images)
-                loss = criterion(output, target)
-=======
             output = model(images)
             loss = criterion(output, target)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
