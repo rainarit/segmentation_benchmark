@@ -3,9 +3,10 @@ import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Union, List, Dict, Any, cast
 from .divisive_norm_exc_inh import *
+from .exc_inh_divisive_norm import *
 
 __all__ = [
-    'VGG', 'vgg9_divnorm', 'vgg9_base', 'vgg9_divnorm_mini',
+    'VGG', 'vgg9_divnorm', 'vgg9_base', 'vgg9_divnorm_mini', 'vgg9_eidivnorm_mini',
     'vgg11', 'vgg11_bn', 
     'vgg13', 'vgg13_bn', 
     'vgg16', 'vgg16_bn',
@@ -77,6 +78,8 @@ def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequ
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         elif v == 'D':
             layers += [DivNormExcInh(in_channels, None, None, None, None, 5)]
+        elif v == 'E':
+            layers += [ExcInhDivNorm(in_channels, divnorm_fsize=5)]
         else:
             v = cast(int, v)
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
@@ -96,6 +99,7 @@ cfgs: Dict[str, List[Union[str, int]]] = {
     'F_mini': [64, 'D', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'], 
     'F': [64, 'D', 'M', 128, 'D', 'M', 256, 256, 'D', 'M', 512, 512, 'M'],
     'F_b': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
+    'G_mini': [64, 'E', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'], 
 }
 
 
@@ -119,6 +123,17 @@ def vgg9_divnorm_mini(pretrained: bool = False, progress: bool = True, **kwargs:
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vgg('vgg9_divnorm_mini', 'F_mini', False, pretrained, progress, **kwargs)
+
+
+def vgg9_eidivnorm_mini(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+    r"""VGG 9-layer model (configuration "G_mini") with minimal EIdivnorm over
+    `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _vgg('vgg9_eidivnorm_mini', 'G_mini', False, pretrained, progress, **kwargs)
 
 
 def vgg9_divnorm(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
