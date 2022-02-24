@@ -30,9 +30,7 @@ from torch.utils.tensorboard import SummaryWriter
 import models.vgg as models_vgg
 import utils
 
-seed = 56
-np.random.seed(seed)
-torch.manual_seed(seed)
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -81,8 +79,6 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
-parser.add_argument('--inplanes', default=64, type=int,
-                    help='Number of inplanes (conv1 - ResNet)')
 parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
@@ -122,6 +118,7 @@ def main():
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         cudnn.deterministic = True
         warnings.warn('You have chosen to seed training. '
                       'This will turn on the CUDNN deterministic setting, '
@@ -200,11 +197,8 @@ def main_worker(gpu, ngpus_per_node, args):
             model = models_vgg.__dict__[args.arch](pretrained=True, num_classes=num_classes)
     else:
         print("=> creating model '{}'".format(args.arch))
-        if "divnorm" in str(args.arch):
-            model_name = str(args.arch)
-            model = models_vgg.__dict__[model_name](pretrained=False, num_classes=num_classes)
-        else:
-            model = models_vgg.__dict__[args.arch](pretrained=False, num_classes=num_classes)
+        model_name = str(args.arch)
+        model = models_vgg.__dict__[args.arch](pretrained=False, num_classes=num_classes)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -238,7 +232,7 @@ def main_worker(gpu, ngpus_per_node, args):
             model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss()#.cuda(args.gpu)
+    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -299,10 +293,11 @@ def main_worker(gpu, ngpus_per_node, args):
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     else:
         train_sampler = None
-
+    print("Creating dataloader..")
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    print("Created dataloader..")
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
