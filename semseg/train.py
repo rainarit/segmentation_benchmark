@@ -62,7 +62,7 @@ def criterion(inputs, target):
         return losses['out']
     return losses['out'] + 0.5 * losses['aux']
 
-def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
+def evaluate(model, data_loader, device, num_classes, output_dir, save=True):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -92,15 +92,16 @@ def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
             output = output['out']
 
             if save:
-                inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-                
-                image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
-                target_path = os.path.join(target_dir, '{}.npy'.format(idx))
-                prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
+                if idx < 100:
+                    inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+                    
+                    image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
+                    target_path = os.path.join(target_dir, '{}.npy'.format(idx))
+                    prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
 
-                utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
-                utils.save_on_master(target, target_path)
-                utils.save_on_master(output, prediction_path)
+                    utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
+                    utils.save_on_master(target, target_path)
+                    utils.save_on_master(output, prediction_path)
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
@@ -159,7 +160,6 @@ def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, devi
         scaler.update()
 
         lr_scheduler.step()
-
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -303,8 +303,13 @@ def main(args):
 
         epoch_dir = os.path.join(output_val_epochs_dir, "epoch_{}/".format(epoch))
         utils.mkdir(epoch_dir)
+
+        if epoch == 49:
+            save=True
+        else:
+            save=False
     
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir, save=save)
         print(confmat)
 
         confmat_iu = confmat.get_IoU()

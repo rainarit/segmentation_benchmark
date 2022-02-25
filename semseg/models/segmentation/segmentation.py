@@ -21,23 +21,28 @@ model_urls = {
 
 def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained_backbone=True):
     if 'divnorm' in backbone_name:
-        back_name = backbone_name.split("_divnorm")[0]
-        if 'ei' in backbone_name:
-            backbone = resnet_divnorm.__dict__[back_name](
-            pretrained=pretrained_backbone,
-            replace_stride_with_dilation=[False, True, True], 
-            divnorm_fsize=divnorm_fsize, 
-            use_exc_inh=True)
+        resnet_name = backbone_name.split("_")[0]
+        use_exh_inh = True if 'ei' in backbone_name else False
+        if use_exh_inh:
+            backbone = resnet_divnorm.__dict__[resnet_name](
+                backbone_name=backbone_name,
+                pretrained=pretrained_backbone,
+                replace_stride_with_dilation=[False, True, True], 
+                divnorm_fsize=divnorm_fsize, 
+                use_exc_inh=True)
         else:
-            backbone = resnet_divnorm.__dict__[back_name](
-            pretrained=pretrained_backbone,
-            replace_stride_with_dilation=[False, True, True], 
-            divnorm_fsize=divnorm_fsize, 
-            use_exc_inh=False)
+            backbone = resnet_divnorm.__dict__[resnet_name](
+                backbone_name=backbone_name,
+                pretrained=pretrained_backbone,
+                replace_stride_with_dilation=[False, True, True], 
+                divnorm_fsize=divnorm_fsize, 
+                use_exc_inh=False)
+
         out_layer = 'layer4'
         out_inplanes = 2048
         aux_layer = 'layer3'
         aux_inplanes = 1024
+
     elif 'resnet' in backbone_name:
         backbone = resnet.__dict__[backbone_name](
             pretrained=pretrained_backbone,

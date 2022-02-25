@@ -3,9 +3,11 @@ import os
 import random
 import shutil
 import time
+from typing import OrderedDict
 import warnings
 from enum import Enum
 import csv
+import urllib
 
 import torch
 import torch.nn as nn
@@ -140,6 +142,44 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
+        # for name, param in model.named_parameters():
+        #     if param.requires_grad:
+        #         print(name)
+
+    # optionally resume from a checkpoint
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.gpu is None:
+                checkpoint = torch.load(args.resume)
+            else:
+                # Map model to be loaded to specified single gpu.
+                loc = 'cuda:{}'.format(args.gpu)
+                checkpoint = torch.load(args.resume, map_location=loc)
+
+            checkpoint_dict = OrderedDict()
+            for key in checkpoint['state_dict'].keys():
+                if "module" in key:
+                    sub_key = key.replace('module.', '')
+                    checkpoint_dict[str(sub_key)] = checkpoint['state_dict'][str(key)]
+            #print(checkpoint['model'].keys())
+            model.load_state_dict(checkpoint_dict)
+            # args.start_epoch = checkpoint['epoch']
+            # best_acc1 = checkpoint['best_acc1']
+            # if args.gpu is not None:
+            #     # best_acc1 may be from a checkpoint from a different GPU
+            #     best_acc1 = best_acc1.to(args.gpu)
+            # model.load_state_dict(checkpoint['state_dict'])
+            # optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(args.resume, checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(args.resume))
+    
+    # # Print model's state_dict
+    # print("Model's state_dict:")
+    # for param_tensor in model.state_dict():
+    #     print(param_tensor, "\t", model.state_dict()[param_tensor].size())
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -182,62 +222,51 @@ def main_worker(gpu, ngpus_per_node, args):
     output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
     os.mkdir(output_dir)
 
-    # optionally resume from a checkpoint
-    if args.resume:
-        if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
-            if args.gpu is None:
-                checkpoint = torch.load(args.resume)
-            else:
-                # Map model to be loaded to specified single gpu.
-                loc = 'cuda:{}'.format(args.gpu)
-                checkpoint = torch.load(args.resume, map_location=loc)
-            args.start_epoch = checkpoint['epoch']
-            best_acc1 = checkpoint['best_acc1']
-            if args.gpu is not None:
-                # best_acc1 may be from a checkpoint from a different GPU
-                best_acc1 = best_acc1.to(args.gpu)
-            model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.resume, checkpoint['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
-
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.train_data, 'train')
+    traindir = os.path.join(args.train_data, '')
     valdir = os.path.join(args.val_data, '')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+    val_dataset_100_class_to_idx = {'n01558993': 0, 'n01692333': 1, 'n01729322': 2, 'n01735189': 3, 'n01749939': 4, 'n01773797': 5, 'n01820546': 6, 'n01855672': 7, 'n01978455': 8, 'n01980166': 9, 'n01983481': 10, 'n02009229': 11, 'n02018207': 12, 'n02085620': 13, 'n02086240': 14, 'n02086910': 15, 'n02087046': 16, 'n02089867': 17, 'n02089973': 18, 'n02090622': 19, 'n02091831': 20, 'n02093428': 21, 'n02099849': 22, 'n02100583': 23, 'n02104029': 24, 'n02105505': 25, 'n02106550': 26, 'n02107142': 27, 'n02108089': 28, 'n02109047': 29, 'n02113799': 30, 'n02113978': 31, 'n02114855': 32, 'n02116738': 33, 'n02119022': 34, 'n02123045': 35, 'n02138441': 36, 'n02172182': 37, 'n02231487': 38, 'n02259212': 39, 'n02326432': 40, 'n02396427': 41, 'n02483362': 42, 'n02488291': 43, 'n02701002': 44, 'n02788148': 45, 'n02804414': 46, 'n02859443': 47, 'n02869837': 48, 'n02877765': 49, 'n02974003': 50, 'n03017168': 51, 'n03032252': 52, 'n03062245': 53, 'n03085013': 54, 'n03259280': 55, 'n03379051': 56, 'n03424325': 57, 'n03492542': 58, 'n03494278': 59, 'n03530642': 60, 'n03584829': 61, 'n03594734': 62, 'n03637318': 63, 'n03642806': 64, 'n03764736': 65, 'n03775546': 66, 'n03777754': 67, 'n03785016': 68, 'n03787032': 69, 'n03794056': 70, 'n03837869': 71, 'n03891251': 72, 'n03903868': 73, 'n03930630': 74, 'n03947888': 75, 'n04026417': 76, 'n04067472': 77, 'n04099969': 78, 'n04111531': 79, 'n04127249': 80, 'n04136333': 81, 'n04229816': 82, 'n04238763': 83, 'n04336792': 84, 'n04418357': 85, 'n04429376': 86, 'n04435653': 87, 'n04485082': 88, 'n04493381': 89, 'n04517823': 90, 'n04589890': 91, 'n04592741': 92, 'n07714571': 93, 'n07715103': 94, 'n07753275': 95, 'n07831146': 96, 'n07836838': 97, 'n13037406': 98, 'n13040303': 99}
 
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    else:
-        train_sampler = None
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
+    # train_dataset = datasets.ImageFolder(
+    #     traindir,
+    #     transforms.Compose([
+    #         transforms.RandomResizedCrop(224),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ]))
+    
+    val_dataset = datasets.ImageFolder(valdir, transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
-        ])),
-        batch_size=1, shuffle=False,
+        ]))
+
+    val_dataset.samples = []
+    for cls, index in val_dataset_100_class_to_idx.items():
+        dir_path = str(args.val_data)+str(cls)
+        for filename in os.listdir(dir_path):
+            f = os.path.join(dir_path, filename)
+            # checking if it is a file
+            if os.path.isfile(f):
+                val_dataset.samples.append((str(f), index))
+
+    # if args.distributed:
+    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    # else:
+    #     train_sampler = None
+
+    # train_loader = torch.utils.data.DataLoader(
+    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
@@ -247,7 +276,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         top1_avg, top5_avg = validate(val_loader, model, criterion, args)
 
-        acc_csv = os.path.join(eval_dir, args.output.join('_acc.csv'))
+        acc_csv = os.path.join(os.path.join(output_dir, 'eval/'), args.output+'.csv')
         with open(acc_csv, "w") as file:
             writer = csv.writer(file, delimiter=',')
             writer.writerow([float(top1_avg), float(top5_avg)])
@@ -269,11 +298,11 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        top1_avg, top5_avg = validate(val_loader, model, criterion, args)
 
         # remember best acc@1 and save checkpoint
-        is_best = acc1 > best_acc1
-        best_acc1 = max(acc1, best_acc1)
+        is_best = top1_avg > best_acc1
+        best_acc1 = max(top1_avg, best_acc1)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -283,7 +312,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best)
+            }, is_best, filename=os.path.join(output_dir, "checkpoint_{}.pth".format(epoch)))
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -332,7 +361,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
 
-
 def validate(val_loader, model, criterion, args):
     batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
     losses = AverageMeter('Loss', ':.4e', Summary.NONE)
@@ -354,9 +382,10 @@ def validate(val_loader, model, criterion, args):
             if torch.cuda.is_available():
                 target = target.cuda(args.gpu, non_blocking=True)
 
-            # compute output
-            output = model(images)
-            loss = criterion(output, target)
+            # Casts operations to mixed precision
+            with torch.cuda.amp.autocast():
+                output = model(images)
+                loss = criterion(output, target)
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))

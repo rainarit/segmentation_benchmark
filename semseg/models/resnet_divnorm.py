@@ -5,6 +5,7 @@ import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
 from .divisive_norm_exc_inh import DivNormExcInh as DivNormEI
+from .exc_inh_divisive_norm import ExcInhDivNorm as EIDivNorm
 from .divisive_norm import DivNorm
 
 torch.autograd.set_detect_anomaly(True)
@@ -163,6 +164,7 @@ class ResNet_DivNorm(nn.Module):
         residual_divnorm: bool = True,
         divnorm_fsize: int = 7,
         use_exc_inh: bool = True,
+        backbone_name: str = "resnet50_divnormei",
     ) -> None:
         super(ResNet_DivNorm, self).__init__()
         if norm_layer is None:
@@ -188,11 +190,15 @@ class ResNet_DivNorm(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
 
-        if  self.use_exc_inh:
-            print("-- Using Exc+Inh")
-            self.div = DivNormEI(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
+        if self.use_exc_inh:
+            if backbone_name.find('ei') > backbone_name.find('divnorm'):
+                print("-- DivNormEI")
+                self.div = DivNormEI(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
+            else:
+                print("-- EIDivNorm")
+                self.div = EIDivNorm(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, groups=1)
         else:
-            print("-- Not Using Exc+Inh")
+            print("-- DivNorm")
             self.div = DivNorm(64, divnorm_fsize=self.divnorm_fsize, groups=1)
 
         self.relu = nn.ReLU(inplace=True)
@@ -295,10 +301,11 @@ def _resnet(
     pretrained: bool,
     progress: bool,
     divnorm_fsize: int,
+    backbone_name: str,
     use_exc_inh: True,
     **kwargs: Any
 ) -> ResNet_DivNorm:
-    model = ResNet_DivNorm(block, layers, divnorm_fsize=divnorm_fsize, use_exc_inh=use_exc_inh, **kwargs)
+    model = ResNet_DivNorm(block, layers, divnorm_fsize=divnorm_fsize, use_exc_inh=use_exc_inh, backbone_name=backbone_name, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -330,14 +337,14 @@ def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet50(pretrained: bool = False, progress: bool = True, divnorm_fsize: int = 7, use_exc_inh: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet50(pretrained: bool = False, progress: bool = True, divnorm_fsize: int = 7, use_exc_inh: bool = True, backbone_name: str = "resnet50_divnormei", **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress, divnorm_fsize=divnorm_fsize, use_exc_inh = use_exc_inh,
+    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress, divnorm_fsize=divnorm_fsize, use_exc_inh = use_exc_inh, backbone_name=backbone_name,
                    **kwargs)
 
 
