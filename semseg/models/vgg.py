@@ -1,12 +1,20 @@
 import torch
 import torch.nn as nn
+
+from models.dale_rnn import DaleRNNLayer
 from .utils import load_state_dict_from_url
 from typing import Union, List, Dict, Any, cast
+<<<<<<< HEAD
 from .divisive_norm import *
+=======
+from .divisive_norm_exc_inh import *
+from .exc_inh_divisive_norm import *
+>>>>>>> 6fd3862cb623872b312dd59731e065843011c259
 
 __all__ = [
-    'VGG', 'vgg9_divnorm', 'vgg9_base', 'vgg9_divnorm_mini',
-    'vgg11', 'vgg11_bn', 
+    'VGG', 'vgg9_divnorm', 'vgg9_base', 'vgg9_dalernn_mini',
+    'vgg9_divnorm_mini', 'vgg9_eidivnorm_mini',
+    'vgg9_ctrl', 'vgg11', 'vgg11_bn', 
     'vgg13', 'vgg13_bn', 
     'vgg16', 'vgg16_bn',
     'vgg19_bn', 'vgg19',
@@ -56,8 +64,11 @@ class VGG(nn.Module):
         return x
 
     def _initialize_weights(self) -> None:
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+        for n, m in self.named_modules():
+            if isinstance(m, DaleRNNLayer) or 'rnn_cell' in n:
+                print("Not initializing DaleRNN layer weights")
+                continue
+            elif isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
@@ -76,7 +87,16 @@ def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequ
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         elif v == 'D':
+<<<<<<< HEAD
             layers += [DivNorm(in_channels, exc_lesion = False, inh_lesion = False)]
+=======
+            layers += [DivNormExcInh(in_channels, divnorm_fsize=5)]
+        elif v == 'E':
+            layers += [ExcInhDivNorm(in_channels, divnorm_fsize=5)]
+        elif v == 'R':
+            layers += [DaleRNNLayer(in_channels, in_h=160, in_w=160, 
+                                    hidden_dim=in_channels, divnorm_fsize=5)]
+>>>>>>> 6fd3862cb623872b312dd59731e065843011c259
         else:
             v = cast(int, v)
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
@@ -96,6 +116,10 @@ cfgs: Dict[str, List[Union[str, int]]] = {
     'F_mini': [64, 'D', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'], 
     'F': [64, 'D', 'M', 128, 'D', 'M', 256, 256, 'D', 'M', 512, 512, 'M'],
     'F_b': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
+    'G_mini': [64, 'E', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'], 
+    # 'H': [64, 64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
+    'H': [64, 64, 'M', 256, 'M', 256, 256, 'M', 512, 512, 'M'],
+    'I': [64, 'R', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
 }
 
 
@@ -119,6 +143,39 @@ def vgg9_divnorm_mini(pretrained: bool = False, progress: bool = True, **kwargs:
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vgg('vgg9_divnorm_mini', 'F_mini', False, pretrained, progress, **kwargs)
+
+
+def vgg9_dalernn_mini(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+    r"""VGG 9-layer model (configuration "F_mini") with minimal divnorm over
+    `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _vgg('vgg9_dalernn_mini', 'I', False, pretrained, progress, **kwargs)
+
+
+def vgg9_ctrl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+    r"""VGG 9-layer model (configuration "H") with control conv layer
+    `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _vgg('vgg9_ctrl', 'H', False, pretrained, progress, **kwargs)
+
+
+def vgg9_eidivnorm_mini(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+    r"""VGG 9-layer model (configuration "G_mini") with minimal divnorm over
+    `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_.
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _vgg('vgg9_eidivnorm_mini', 'G_mini', False, pretrained, progress, **kwargs)
 
 
 def vgg9_divnorm(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:

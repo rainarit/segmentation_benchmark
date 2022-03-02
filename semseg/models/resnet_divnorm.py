@@ -308,7 +308,7 @@ def _resnet(
     return model
 
 
-def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet18(pretrained: bool = False, progress: bool = True, residual_divnorm=True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -319,7 +319,7 @@ def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
                    **kwargs)
 
 
-def resnet34(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet34(pretrained: bool = False, progress: bool = True, residual_divnorm=True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -341,7 +341,7 @@ def resnet50(pretrained: bool = False, progress: bool = True, divnorm_fsize: int
                    **kwargs)
 
 
-def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet101(pretrained: bool = False, progress: bool = True, residual_divnorm=True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-101 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
@@ -353,7 +353,7 @@ def resnet101(pretrained: bool = False, progress: bool = True, **kwargs: Any) ->
                    **kwargs)
 
 
-def resnet152(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet_DivNorm:
+def resnet152(pretrained: bool = False, progress: bool = True, residual_divnorm=True, **kwargs: Any) -> ResNet_DivNorm:
     r"""ResNet-152 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:

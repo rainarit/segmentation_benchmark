@@ -96,8 +96,11 @@ export NCCL_DEBUG=INFO
 export NCCL_DEBUG_SUBSYS=ALL
 export NCCL_IB_DISABLE=1
 export NCCL_P2P_DISABLE=1
-export NCCL_SOCKET_IFNAME=eth0
+export NCCL_SOCKET_IFNAME=lo
 """
+seed = 56
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 
 def generate_rand_string(n):
@@ -116,7 +119,7 @@ def main():
     args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
     print("Experiment dir:", args.checkpoint_dir)
     if args.seed is not None:
-        random.seed(args.seed)
+        # random.seed(args.seed)
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
         cudnn.deterministic = True
@@ -203,6 +206,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
     elif args.distributed:
+        print("Distributed data parallel across GPUs")
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
         # DistributedDataParallel will use all available devices.
@@ -223,13 +227,16 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.gpu is not None:
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
+        print("Set to GPU", args.gpu)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
             model.features = torch.nn.DataParallel(model.features)
+            print("Dataparallel enabled")
             model.cuda()
         else:
             model = torch.nn.DataParallel(model).cuda()
+            print("Dataparallel enabled")
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
@@ -318,7 +325,8 @@ def main_worker(gpu, ngpus_per_node, args):
         stats = dict(epoch=epoch,
                     lr_weights=optimizer.param_groups[0]['lr'],
                     val_acc1=val_acc1.item())
-        print(json.dumps(stats), file=global_stats_file)
+        if args.rank == 0:
+            print(json.dumps(stats), file=global_stats_file)
 
         # writer.add_scalar("Train/Best_Acc1", best_acc1, epoch)
         state = {
@@ -368,7 +376,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
 
     end = time.time()
 
-    # Creates once at the beginning of training
+        # Creates once at the beginning of training
     scaler = torch.cuda.amp.GradScaler()
 
     for i, (images, target) in enumerate(train_loader):
@@ -409,9 +417,23 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         if args.rank == 0:
             # Clamping parameters of divnorm to non-negative values
             if "divnorm" in str(args.arch):
-                div_conv_weight = model.features[2].div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.features[2].div.weight.data = div_conv_weight
+                if args.multiprocessing_distributed:
+                    div_conv_weight = model.module.features[2].div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.features[2].div.weight.data = div_conv_weight
+                else:
+                    div_conv_weight = model.features[2].div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.features[2].div.weight.data = div_conv_weight
+            if "dalernn" in str(args.arch):
+                if args.multiprocessing_distributed:
+                    div_conv_weight = model.module.features[2].rnn_cell.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.features[2].rnn_cell.div.weight.data = div_conv_weight
+                else:
+                    div_conv_weight = model.features[2].rnn_cell.div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.features[2].rnn_cell.div.weight.data = div_conv_weight
 
         # measure elapsed time
         batch_time.update(time.time() - end)
