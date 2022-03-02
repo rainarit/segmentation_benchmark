@@ -7,12 +7,7 @@ import torch.nn.functional as F  # pylint: disable=import-error
 def nonnegative_weights_init(m):
     """Non-negative initialization of weights."""
     if isinstance(m, nn.Conv2d):
-        m.weight.data.uniform_(0, 1)
-        m.weight.data.clamp_(0)
-        if m.bias is not None:
-            raise ValueError("Convolution should not contain bias")
-    else:
-        m.data.zero_()
+        nn.init.uniform_(m.weight)
 
 
 class DaleRNNcell(nn.Module):
@@ -40,7 +35,12 @@ class DaleRNNcell(nn.Module):
           self.hidden_dim = in_channels
         else:
           self.hidden_dim = hidden_dim
-        
+        self.div = nn.Conv2d(
+            self.hidden_dim,
+            self.hidden_dim,
+            divnorm_fsize,
+            padding=(divnorm_fsize - 1) // 2,
+            bias=False)
         # recurrent gates computation
         self.g_exc_x = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
         self.ln_e_x = nn.LayerNorm([self.hidden_dim, in_h, in_w])
@@ -61,12 +61,7 @@ class DaleRNNcell(nn.Module):
         self.w_exc_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1)
         self.w_inh_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, inh_fsize, padding=(inh_fsize-1) // 2)
         self.w_inh_e = nn.Conv2d(self.hidden_dim, self.hidden_dim, inh_fsize, padding=(inh_fsize-1) // 2)
-
-        self.div = nn.Conv2d(
-            self.hidden_dim,
-            self.hidden_dim,
-            divnorm_fsize,
-            padding=(divnorm_fsize - 1) // 2)
+        nonnegative_weights_init(self.div)
         
     def forward(self, input, hidden):
       # TODO (make symmetric horizontal connections)
@@ -76,10 +71,10 @@ class DaleRNNcell(nn.Module):
       e_hat_t = torch.relu(self.w_exc_x(input) + self.w_exc_e(exc) - self.w_exc_i(inh))
       # Add a scalar multiplier to i_hat_t to control sub-contrast regime normalization?
       i_hat_t = torch.relu(self.w_inh_x(input) + self.w_inh_e(exc) - self.w_inh_i(inh))
-      exc = g_exc * e_hat_t + (1 - g_exc) * exc
-      inh = g_inh * i_hat_t + (1 - g_inh) * inh
+      exc = F.relu(g_exc * e_hat_t + (1 - g_exc) * exc)
+      inh = F.relu(g_inh * i_hat_t + (1 - g_inh) * inh)
       norm = self.div(exc) + 1e-5
-      exc = self.ln_out(exc / norm)
+      exc = F.relu(self.ln_out(exc / norm))
       return (exc, inh)
 
 
@@ -117,9 +112,10 @@ class DaleRNNLayer(nn.Module):
     else:
       self.temporal_agg = None
   
-  def forward(self, input, state):
+  def forward(self, input):
     outputs_e = []
     outputs_i = []
+    state = (torch.zeros_like(input), torch.zeros_like(input))
     for _ in range(self.timesteps):
         state = self.rnn_cell(input, state)
         outputs_e += [state[0]]
@@ -127,5 +123,5 @@ class DaleRNNLayer(nn.Module):
     if self.temporal_agg is not None:
       outputs_e = torch.cat(outputs_e, dim=1)
       output = self.temporal_agg(outputs_e)
-      return outputs_e, outputs_i, state, output
-    return (outputs_e, outputs_i, state, outputs_e[-1])
+      return output
+    return outputs_e[-1]
