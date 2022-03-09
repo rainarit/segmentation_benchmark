@@ -52,9 +52,9 @@ def get_dataset(dir_path, name, image_set, transform):
 def get_transform(train):
     base_size = 520
     crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, brightness=args.brightness, hue=args.hue, sigma=args.sigma, kernel_size=args.kernel_size)
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
 
-def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
+def evaluate(model, data_loader, device, num_classes, output_dir, save=True):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -87,15 +87,10 @@ def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
             output = model(image)
             output = output['out']
 
-            if save:
-                
-                image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
-                target_path = os.path.join(target_dir, '{}.npy'.format(idx))
-                prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
+            print(output.shape)
 
-                utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
-                utils.save_on_master(target, target_path)
-                utils.save_on_master(output, prediction_path)
+
+            break
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
@@ -230,11 +225,6 @@ def get_args_parser(add_help=True):
     parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
                         help='number of data loading workers (default: 16)')
     parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
-    parser.add_argument('--contrast', default=1.0, type=float)
-    parser.add_argument('--brightness', default=1.0, type=float)
-    parser.add_argument('--hue', default=1.0, type=float)
-    parser.add_argument('--kernel_size', default=1, type=int)
-    parser.add_argument('--sigma', default=1.0, type=float)
     parser.add_argument('--print-freq', default=800, type=int, help='print frequency')
     parser.add_argument('--output', default=['deeplabv3resnet50'], help='path where to save', nargs='+')
     parser.add_argument('--checkpoint', default=['deeplabv3resnet50'], help='resume from checkpoint', nargs='+')

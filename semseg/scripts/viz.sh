@@ -1,0 +1,11 @@
+python3 -m torch.distributed.launch \
+            --nproc_per_node=1 \
+            --master_port 10211 \
+            --use_env get_viz.py \
+            --lr 0.02 \
+            --dataset voc_aug --aux-loss\
+            --model deeplabv3 \
+            --backbone "resnet50_divnorm" \
+            --output "resnet50_divnorm_after_conv1_groups1_viz" \
+            --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset  \
+            --checkpoint "/home/AD/rraina/segmentation_benchmark/semseg/output/resnet50_divnorm_after_conv1_groups1/checkpoints/best_checkpoint.pth"

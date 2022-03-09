@@ -3,12 +3,14 @@ from PIL import Image
 import numbers
 from collections.abc import Sequence
 from typing import Tuple, List, Optional
+import warnings
 
 import random
 
 import torch
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
+from torchvision.transforms.functional import InterpolationMode, _interpolation_modes_from_int
 
 def _check_sequence_input(x, name, req_sizes):
     msg = req_sizes[0] if len(req_sizes) < 2 else " or ".join([str(s) for s in req_sizes])
@@ -224,3 +226,177 @@ class ColorJitterGrid(object):
         image = transforms.ToPILImage()(img_tensor).convert("RGB")
 
         return image, target
+
+class GaussianBlur(torch.nn.Module):
+    """Blurs image with randomly chosen Gaussian blur.
+    If the image is torch Tensor, it is expected
+    to have [..., C, H, W] shape, where ... means an arbitrary number of leading dimensions.
+
+    Args:
+        kernel_size (int or sequence): Size of the Gaussian kernel.
+        sigma (float or tuple of float (min, max)): Standard deviation to be used for
+            creating kernel to perform blurring. If float, sigma is fixed. If it is tuple
+            of float (min, max), sigma is chosen uniformly at random to lie in the
+            given range.
+
+    Returns:
+        PIL Image or Tensor: Gaussian blurred version of the input image.
+
+    """
+
+    def __init__(self, kernel_size, sigma=(0.1, 2.0)):
+        super().__init__()
+        self.kernel_size = _setup_size(kernel_size, "Kernel size should be a tuple/list of two integers")
+        for ks in self.kernel_size:
+            if ks <= 0 or ks % 2 == 0:
+                raise ValueError("Kernel size value should be an odd and positive number.")
+
+        if isinstance(sigma, numbers.Number):
+            if sigma <= 0:
+                raise ValueError("If sigma is a single number, it must be positive.")
+            sigma = (sigma, sigma)
+        elif isinstance(sigma, Sequence) and len(sigma) == 2:
+            if not 0.0 < sigma[0] <= sigma[1]:
+                raise ValueError("sigma values should be positive and of the form (min, max).")
+        else:
+            raise ValueError("sigma should be a single number or a list/tuple with length 2.")
+
+        self.sigma = sigma
+
+    @staticmethod
+    def get_params(sigma_min: float, sigma_max: float) -> float:
+        """Choose sigma for random gaussian blurring.
+
+        Args:
+            sigma_min (float): Minimum standard deviation that can be chosen for blurring kernel.
+            sigma_max (float): Maximum standard deviation that can be chosen for blurring kernel.
+
+        Returns:
+            float: Standard deviation to be passed to calculate kernel for gaussian blurring.
+        """
+        return torch.empty(1).uniform_(sigma_min, sigma_max).item()
+
+    def __call__(self, image, target):
+        """
+        Args:
+            img (PIL Image or Tensor): image to be blurred.
+
+        Returns:
+            PIL Image or Tensor: Gaussian blurred image
+        """
+        sigma = self.get_params(self.sigma[0], self.sigma[1])
+        return F.gaussian_blur(image, self.kernel_size, [sigma, sigma]), target
+
+    def __repr__(self) -> str:
+        s = f"{self.__class__.__name__}(kernel_size={self.kernel_size}, sigma={self.sigma})"
+        return s
+
+
+def _setup_size(size, error_msg):
+    if isinstance(size, numbers.Number):
+        return int(size), int(size)
+
+    if isinstance(size, Sequence) and len(size) == 1:
+        return size[0], size[0]
+
+    if len(size) != 2:
+        raise ValueError(error_msg)
+
+    return size
+
+
+def _check_sequence_input(x, name, req_sizes):
+    msg = req_sizes[0] if len(req_sizes) < 2 else " or ".join([str(s) for s in req_sizes])
+    if not isinstance(x, Sequence):
+        raise TypeError(f"{name} should be a sequence of length {msg}.")
+    if len(x) not in req_sizes:
+        raise ValueError(f"{name} should be sequence of length {msg}.")
+
+
+def _setup_angle(x, name, req_sizes=(2,)):
+    if isinstance(x, numbers.Number):
+        if x < 0:
+            raise ValueError(f"If {name} is a single number, it must be positive.")
+        x = [-x, x]
+    else:
+        _check_sequence_input(x, name, req_sizes)
+
+    return [float(d) for d in x]
+
+class Resize(torch.nn.Module):
+    """Resize the input image to the given size.
+    If the image is torch Tensor, it is expected
+    to have [..., H, W] shape, where ... means an arbitrary number of leading dimensions
+
+    .. warning::
+        The output image might be different depending on its type: when downsampling, the interpolation of PIL images
+        and tensors is slightly different, because PIL applies antialiasing. This may lead to significant differences
+        in the performance of a network. Therefore, it is preferable to train and serve a model with the same input
+        types. See also below the ``antialias`` parameter, which can help making the output of PIL images and tensors
+        closer.
+
+    Args:
+        size (sequence or int): Desired output size. If size is a sequence like
+            (h, w), output size will be matched to this. If size is an int,
+            smaller edge of the image will be matched to this number.
+            i.e, if height > width, then image will be rescaled to
+            (size * height / width, size).
+
+            .. note::
+                In torchscript mode size as single int is not supported, use a sequence of length 1: ``[size, ]``.
+        interpolation (InterpolationMode): Desired interpolation enum defined by
+            :class:`torchvision.transforms.InterpolationMode`. Default is ``InterpolationMode.BILINEAR``.
+            If input is Tensor, only ``InterpolationMode.NEAREST``, ``InterpolationMode.BILINEAR`` and
+            ``InterpolationMode.BICUBIC`` are supported.
+            For backward compatibility integer values (e.g. ``PIL.Image.NEAREST``) are still acceptable.
+        max_size (int, optional): The maximum allowed for the longer edge of
+            the resized image: if the longer edge of the image is greater
+            than ``max_size`` after being resized according to ``size``, then
+            the image is resized again so that the longer edge is equal to
+            ``max_size``. As a result, ``size`` might be overruled, i.e the
+            smaller edge may be shorter than ``size``. This is only supported
+            if ``size`` is an int (or a sequence of length 1 in torchscript
+            mode).
+        antialias (bool, optional): antialias flag. If ``img`` is PIL Image, the flag is ignored and anti-alias
+            is always used. If ``img`` is Tensor, the flag is False by default and can be set to True for
+            ``InterpolationMode.BILINEAR`` only mode. This can help making the output for PIL images and tensors
+            closer.
+
+            .. warning::
+                There is no autodiff support for ``antialias=True`` option with input ``img`` as Tensor.
+
+    """
+
+    def __init__(self, size, interpolation=InterpolationMode.BILINEAR, max_size=None, antialias=None):
+        super().__init__()
+        if not isinstance(size, (int, Sequence)):
+            raise TypeError(f"Size should be int or sequence. Got {type(size)}")
+        if isinstance(size, Sequence) and len(size) not in (1, 2):
+            raise ValueError("If size is a sequence, it should have 1 or 2 values")
+        self.size = size
+        self.max_size = max_size
+
+        # Backward compatibility with integer value
+        if isinstance(interpolation, int):
+            warnings.warn(
+                "Argument interpolation should be of type InterpolationMode instead of int. "
+                "Please, use InterpolationMode enum."
+            )
+            interpolation = _interpolation_modes_from_int(interpolation)
+
+        self.interpolation = interpolation
+        self.antialias = antialias
+
+    def __call__(self, image, target):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be scaled.
+
+        Returns:
+            PIL Image or Tensor: Rescaled image.
+        """
+        return F.resize(image, self.size, self.interpolation, self.max_size, self.antialias), target
+
+    def __repr__(self) -> str:
+        detail = f"(size={self.size}, interpolation={self.interpolation.value}, max_size={self.max_size}, antialias={self.antialias})"
+        return f"{self.__class__.__name__}{detail}"

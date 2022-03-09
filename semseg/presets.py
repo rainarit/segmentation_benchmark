@@ -30,12 +30,13 @@ class SegmentationPresetTrain:
         return aug_img, target
 
 class SegmentationPresetEval:
-    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, hue=1, sigma=1):
+    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, hue=1, sigma=1, kernel_size=1):
         self.contrast_initial = contrast
         self.contrast = contrast
         self.brightness = brightness
         self.hue = hue
         self.sigma = sigma
+        self.kernel_size = kernel_size
 
         if self.contrast != 1.0:
             self.contrast_initial=self.contrast-1.0
@@ -59,13 +60,15 @@ class SegmentationPresetEval:
 
         print("Contrast: ({}, {})".format(str(self.contrast_initial), str(self.contrast)))
         print("Brightness: ({}, {})".format(str(self.brightness_initial), str(self.brightness)))
+        print("Kernel Size: {}".format(self.kernel_size))
         print("Sigma: ({}, {})".format(str(self.sigma_initial), str(self.sigma)))
 
         self.transforms = T.Compose([
+            #T.RandomResize(base_size, base_size),
             T.RandomResize(base_size, base_size),
+            #T.ColorJitter(brightness=(self.brightness_initial, self.brightness)),
+            #T.GaussianBlur(kernel_size=self.kernel_size, sigma=self.sigma),
             T.ToTensor(),
-            T.ColorJitter(contrast=(self.contrast_initial, self.contrast)),
-            #T.GaussianBlur(kernel_size=5, sigma=(self.sigma_initial, self.sigma)),
             T.Normalize(mean=mean, std=std),
         ])
 
