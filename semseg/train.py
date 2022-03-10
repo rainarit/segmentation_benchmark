@@ -1,194 +1,112 @@
 import datetime
 import os
 import time
+
+import presets
 import torch
 import torch.utils.data
-import transforms as T
-from torch import nn
 import torchvision
-import numpy as np
-import scipy.io
-import random
-from PIL import Image
-import matplotlib.image as mpimg
-from tqdm import tqdm
-from coco_utils import get_coco
-import presets
 import utils
-from torchvision import utils as torch_utils
-import os
-import sys
-import torch
-import torch.distributed as dist
-import matplotlib.pyplot as plt
-import math
+from coco_utils import get_coco
+from torch import nn
 
-from torchvision.utils import save_image
-import torch
-import torchvision
-from torch.utils.tensorboard import SummaryWriter
-from models.segmentation.segmentation import _load_model as load_model
-import  csv
-from torchvision.utils import save_image
-
+try:
+    from torchvision import prototype
+except ImportError:
+    prototype = None
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
-        return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
+        return torchvision.datasets.SBDataset(*args, mode="segmentation", **kwargs)
+
     paths = {
-        "coco": (dir_path, get_coco, 21), 
         "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
-        "voc_aug": (dir_path, sbd, 21)
+        "voc_aug": (dir_path, sbd, 21),
+        "coco": (dir_path, get_coco, 21),
     }
     p, ds_fn, num_classes = paths[name]
-    if name == "voc":
-        ds = ds_fn(p, year="2012", image_set=image_set, transforms=transform, download=False)
-    elif name == "voc_aug":
-        ds = ds_fn(p, image_set=image_set, transforms=transform, download=False)
-    else:
-        ds = ds_fn(p, image_set=image_set, transforms=transform, download=False)
+
+    ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
 
-def get_transform(train):
-    base_size = 520
-    crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast)
+def get_transform(train, args):
+    if train:
+        return presets.SegmentationPresetTrain(base_size=520, crop_size=480)
+    elif not args.prototype:
+        return presets.SegmentationPresetEval(base_size=520)
+    else:
+        if args.weights:
+            weights = prototype.models.get_weight(args.weights)
+            return weights.transforms()
+        else:
+            return prototype.transforms.SemanticSegmentationEval(resize_size=520)
 
 def criterion(inputs, target):
     losses = {}
     for name, x in inputs.items():
-        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255, reduction='mean')
+        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
+
     if len(losses) == 1:
-        return losses['out']
-    return losses['out'] + 0.5 * losses['aux']
+        return losses["out"]
 
-def evaluate(model, data_loader, device, num_classes, output_dir, save=True):
+    return losses["out"] + 0.5 * losses["aux"]
+
+def evaluate(model, data_loader, device, num_classes):
     model.eval()
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Test:'
-
     confmat = utils.ConfusionMatrix(num_classes)
-    per_mean_iou = list()
-
-    image_epoch_dir = os.path.join(output_dir, "images/")
-    utils.mkdir(image_epoch_dir)
-    image_dir = os.path.join(output_dir, "images/image/")
-    utils.mkdir(image_dir)
-    target_dir = os.path.join(output_dir, "images/target/")
-    utils.mkdir(target_dir)
-    prediction_dir = os.path.join(output_dir, "images/prediction/")
-    utils.mkdir(prediction_dir)
-    mean_iou_file = os.path.join(output_dir, "mean_iou.csv")
-    per_mean_iou_file = os.path.join(output_dir, "per_image_mean_iou.csv")
-
-    with torch.no_grad():
-        start_time = time.time()
-        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = "Evaluate:"
+    with torch.inference_mode():
+        for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
-
-            confmat_image = utils.ConfusionMatrix(num_classes)
-
             output = model(image)
-            output = output['out']
-
-            if save:
-                if idx < 100:
-                    inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-                    
-                    image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
-                    target_path = os.path.join(target_dir, '{}.npy'.format(idx))
-                    prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
-
-                    utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
-                    utils.save_on_master(target, target_path)
-                    utils.save_on_master(output, prediction_path)
+            output = output["out"]
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
-            confmat_image.update(target.flatten(), output.argmax(1).flatten())
-            acc_global, acc, iu = confmat_image.compute()
-            confmat_image.reduce_from_all_processes()
-
-            image_mean_iou = list((iu * 100).tolist())
-            per_mean_iou.append(image_mean_iou)
-
         confmat.reduce_from_all_processes()
 
-        total_time = time.time() - start_time
-        total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-        print('Validation time {}'.format(total_time_str))
-    
-    with open(per_mean_iou_file, 'w', newline='') as f:
-            wr = csv.writer(f, quoting=csv.QUOTE_ALL)
-            wr.writerow(per_mean_iou)
-    with open(mean_iou_file, 'w', newline='') as f:
-            wr = csv.writer(f, quoting=csv.QUOTE_ALL)
-            wr.writerow([confmat.get_IoU()])
     return confmat
 
-def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq):
-
+def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, scaler=None):
     model.train()
-
-    metric_logger = utils.MetricLogger(delimiter="  ") 
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value}'))
-    header = 'Epoch: [{}]'.format(epoch)
-
-    # Creates once at the beginning of training
-    scaler = torch.cuda.amp.GradScaler()
-
-    for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
+    header = f"Epoch: [{epoch}]"
+    for image, target in metric_logger.log_every(data_loader, print_freq, header):
         image, target = image.to(device), target.to(device)
-
-        # Casts operations to mixed precision
-        optimizer.zero_grad()
-
-        # Clamping parameters of divnorm to non-negative values
-        if "divnorm" in str(args.backbone):
-            for module_name, module in model.named_modules():
-                if module_name.endswith("div.div"):
-                    curr_module_weight = module.weight.data
-                    curr_module_weight = curr_module_weight.clamp(min=0.)
-                    module.weight.data = curr_module_weight
-
-        with torch.cuda.amp.autocast():
+        with torch.cuda.amp.autocast(enabled=scaler is not None):
             output = model(image)
             loss = criterion(output, target)
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        optimizer.zero_grad()
+        if scaler is not None:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         lr_scheduler.step()
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
 def main(args):
-
-    seed=args.seed
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-    g = torch.Generator()
-    g.manual_seed(seed)
+    if args.prototype and prototype is None:
+        raise ImportError("The prototype module couldn't be found. Please install the latest torchvision nightly.")
+    if not args.prototype and args.weights:
+        raise ValueError("The weights parameter works only in prototype mode. Please pass the --prototype argument.")
+    if args.output_dir:
+        utils.mkdir(args.output_dir)
 
     utils.init_distributed_mode(args)
-    args.distributed=False
-
-    current_miou = 0.0
-
     print(args)
 
     device = torch.device(args.device)
 
-    dataset, num_classes = get_dataset(args.data_path, args.dataset, "train_noval", get_transform(train=True))
-
-    dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+    dataset, num_classes = get_dataset(args.data_path, args.dataset, "train", get_transform(True, args))
+    dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(False, args))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
@@ -197,185 +115,149 @@ def main(args):
         train_sampler = torch.utils.data.RandomSampler(dataset)
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
-    data_loader = torch.utils.data.DataLoader(dataset, 
-        batch_size=args.batch_size, 
-        sampler=train_sampler, 
-        num_workers=args.workers, 
-        collate_fn=utils.collate_fn, 
-        drop_last=True)
+    data_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        sampler=train_sampler,
+        num_workers=args.workers,
+        collate_fn=utils.collate_fn,
+        drop_last=True,
+    )
 
-    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
-        batch_size=1, 
-        sampler=test_sampler, 
-        num_workers=args.workers, 
-        collate_fn=utils.collate_fn)
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test, batch_size=1, sampler=test_sampler, num_workers=args.workers, collate_fn=utils.collate_fn
+    )
 
-
-    model = load_model(arch_type=args.model, 
-                       backbone=args.backbone,
-                       pretrained=False,
-                       progress=True, 
-                       num_classes=num_classes, 
-                       aux_loss=args.aux_loss, 
-                       divnorm_fsize=5)
-    
+    if not args.prototype:
+        model = torchvision.models.segmentation.__dict__[args.model](
+            pretrained=args.pretrained,
+            num_classes=num_classes,
+            aux_loss=args.aux_loss,
+        )
+    else:
+        model = prototype.models.segmentation.__dict__[args.model](
+            weights=args.weights, num_classes=num_classes, aux_loss=args.aux_loss
+        )
     model.to(device)
-
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model_without_ddp = model
-
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
     params_to_optimize = [
         {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
         {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
     ]
-
     if args.aux_loss:
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
-    
-    optimizer = torch.optim.SGD(
-        params_to_optimize,
-        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda x: (1 - x / (len(data_loader) * args.epochs)) ** 0.9)
-    
+    optimizer = torch.optim.SGD(params_to_optimize, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
+    scaler = torch.cuda.amp.GradScaler() if args.amp else None
+
+    iters_per_epoch = len(data_loader)
+    main_lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, lambda x: (1 - x / (iters_per_epoch * (args.epochs - args.lr_warmup_epochs))) ** 0.9
+    )
+
+    if args.lr_warmup_epochs > 0:
+        warmup_iters = iters_per_epoch * args.lr_warmup_epochs
+        args.lr_warmup_method = args.lr_warmup_method.lower()
+        if args.lr_warmup_method == "linear":
+            warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                optimizer, start_factor=args.lr_warmup_decay, total_iters=warmup_iters
+            )
+        elif args.lr_warmup_method == "constant":
+            warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+                optimizer, factor=args.lr_warmup_decay, total_iters=warmup_iters
+            )
+        else:
+            raise RuntimeError(
+                f"Invalid warmup lr method '{args.lr_warmup_method}'. Only linear and constant are supported."
+            )
+        lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
+            optimizer, schedulers=[warmup_lr_scheduler, main_lr_scheduler], milestones=[warmup_iters]
+        )
+    else:
+        lr_scheduler = main_lr_scheduler
+
+    if args.resume:
+        checkpoint = torch.load(args.resume, map_location="cpu")
+        model_without_ddp.load_state_dict(checkpoint["model"], strict=not args.test_only)
+        if not args.test_only:
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+            args.start_epoch = checkpoint["epoch"] + 1
+            if args.amp:
+                scaler.load_state_dict(checkpoint["scaler"])
+
     if args.test_only:
-        output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
-        output_val_test_dir = os.path.join(output_dir, "val_test_only/")
-        if not(os.path.isdir(output_dir)):
-            utils.mkdir(output_dir)
-        if not(os.path.isdir(output_val_test_dir)):
-            utils.mkdir(output_val_test_dir)
-        mean_iou_file = os.path.join(output_val_test_dir, "mean_iou.csv")
-
-        try:
-            checkpoint = torch.load(str(args.resume))
-            model_without_ddp.load_state_dict(checkpoint['model'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-        except:
-            sys.exit('Error with checkpoint weights file.')
-
-        confmat, per_image_mean = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=output_val_test_dir)
-        confmat_iu = confmat.get_IoU()    
-
-        with open(mean_iou_file, 'w', newline='') as f:
-            wr = csv.writer(f, quoting=csv.QUOTE_ALL)
-            wr.write([confmat_iu])  
-
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
         return
-    
-    output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output)
-    output_val_dir = os.path.join(output_dir, "val/")
-    output_checkpoints_dir = os.path.join(output_dir, "checkpoints/")
-    output_val_epochs_dir = os.path.join(output_dir, "val/epochs/")
-    if not(os.path.isdir(output_dir)):
-        utils.mkdir(output_dir)
-    if not(os.path.isdir(output_val_dir)):
-        utils.mkdir(output_val_dir)
-    if not(os.path.isdir(output_checkpoints_dir)):
-        utils.mkdir(output_checkpoints_dir)
-    if not(os.path.isdir(output_val_epochs_dir)):
-        utils.mkdir(output_val_epochs_dir)
-    
-    mean_iou_file = os.path.join(output_dir, "mean_iou.csv")
-    mean_iou_list = list()
-
-    per_image_mean_iou_file = str(args.output) + "_per_image_mean_iou.csv"
 
     start_time = time.time()
-
     for epoch in range(args.start_epoch, args.epochs):
-
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        
-        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq)
-
-        epoch_dir = os.path.join(output_val_epochs_dir, "epoch_{}/".format(epoch))
-        utils.mkdir(epoch_dir)
-
-        if epoch == 49:
-            save=True
-        else:
-            save=False
-    
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=epoch_dir, save=save)
+        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, scaler)
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
-
-        confmat_iu = confmat.get_IoU()
-        confmat_acc_global = confmat.get_acc_global_correct()
-        mean_iou_list.append(confmat_iu)
-
-        if float(confmat_iu) > current_miou:
-            checkpoint = {
-                    'model': model_without_ddp.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': lr_scheduler.state_dict(),
-                    'epoch': epoch,
-                    'args': args,
-                    'miou': float(confmat_iu)
-            }
-            utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'best_checkpoint.pth'))
-
-        if args.epochs-epoch <= 10:
-            checkpoint = {
-                    'model': model_without_ddp.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': lr_scheduler.state_dict(),
-                    'epoch': epoch,
-                    'args': args,
-                    'miou': float(confmat_iu)
-            }
-            
-            utils.save_on_master(checkpoint, os.path.join(output_checkpoints_dir, 'checkpoint_{}.pth'.format(epoch)))
-
-
-    with open(mean_iou_file, 'w', newline='') as f:
-        wr = csv.writer(f, quoting=csv.QUOTE_ALL)
-        wr.writerow(mean_iou_list)
+        checkpoint = {
+            "model": model_without_ddp.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "lr_scheduler": lr_scheduler.state_dict(),
+            "epoch": epoch,
+            "args": args,
+        }
+        if args.amp:
+            checkpoint["scaler"] = scaler.state_dict()
+        utils.save_on_master(checkpoint, os.path.join(args.output_dir, f"model_{epoch}.pth"))
+        utils.save_on_master(checkpoint, os.path.join(args.output_dir, "checkpoint.pth"))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    print('Training time {}'.format(total_time_str))
+    print(f"Training time {total_time_str}")
 
 def get_args_parser(add_help=True):
     import argparse
-    parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
-    parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
-    parser.add_argument('--seed', default=429, type=float, help='seed')
-    parser.add_argument('--dataset', default='coco', help='dataset name')
-    parser.add_argument('--model', default='deeplabv3', help='model')
-    parser.add_argument('--backbone', default='resnet101', help='backbone')
-    parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
-    parser.add_argument('--device', default='cuda', help='device')
-    parser.add_argument('-b', '--batch-size', default=8, type=int)
-    parser.add_argument('--epochs', default=30, type=int, metavar='N',
-                        help='number of total epochs to run')
-    parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
-                        help='number of data loading workers (default: 16)')
-    parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                        help='momentum')
-    parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
-                        metavar='W', help='weight decay (default: 1e-4)',
-                        dest='weight_decay')
-    parser.add_argument('--contrast', default=1.0, type=float)
-    parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output', default='./deeplabv3resnet50', help='path where to save')
-    parser.add_argument('--resume', default='', help='resume from checkpoint')
-    parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
-                        help='start epoch')
+    parser = argparse.ArgumentParser(description="PyTorch Segmentation Training", add_help=add_help)
+
+    parser.add_argument("--data-path", default="/datasets01/COCO/022719/", type=str, help="dataset path")
+    parser.add_argument("--dataset", default="coco", type=str, help="dataset name")
+    parser.add_argument("--model", default="fcn_resnet101", type=str, help="model name")
+    parser.add_argument("--aux-loss", action="store_true", help="auxiliar loss")
+    parser.add_argument("--device", default="cuda", type=str, help="device (Use cuda or cpu Default: cuda)")
+    parser.add_argument(
+        "-b", "--batch-size", default=8, type=int, help="images per gpu, the total batch size is $NGPU x batch_size"
+    )
+    parser.add_argument("--epochs", default=30, type=int, metavar="N", help="number of total epochs to run")
+
+    parser.add_argument(
+        "-j", "--workers", default=16, type=int, metavar="N", help="number of data loading workers (default: 16)"
+    )
+    parser.add_argument("--lr", default=0.01, type=float, help="initial learning rate")
+    parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
+    parser.add_argument(
+        "--wd",
+        "--weight-decay",
+        default=1e-4,
+        type=float,
+        metavar="W",
+        help="weight decay (default: 1e-4)",
+        dest="weight_decay",
+    )
+    parser.add_argument("--lr-warmup-epochs", default=0, type=int, help="the number of epochs to warmup (default: 0)")
+    parser.add_argument("--lr-warmup-method", default="linear", type=str, help="the warmup method (default: linear)")
+    parser.add_argument("--lr-warmup-decay", default=0.01, type=float, help="the decay for lr")
+    parser.add_argument("--print-freq", default=10, type=int, help="print frequency")
+    parser.add_argument("--output-dir", default=".", type=str, help="path to save outputs")
+    parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
+    parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
     parser.add_argument(
         "--test-only",
         dest="test_only",
@@ -389,9 +271,20 @@ def get_args_parser(add_help=True):
         action="store_true",
     )
     # distributed training parameters
-    parser.add_argument('--world-size', default=1, type=int,
-                        help='number of distributed processes')
-    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+    parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
+    parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
+
+    # Prototype models only
+    parser.add_argument(
+        "--prototype",
+        dest="prototype",
+        help="Use prototype model builders instead those from main area",
+        action="store_true",
+    )
+    parser.add_argument("--weights", default=None, type=str, help="the weights enum name to load")
+
+    # Mixed precision training parameters
+    parser.add_argument("--amp", action="store_true", help="Use torch.cuda.amp for mixed precision training")
 
     return parser
 
