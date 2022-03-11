@@ -22,6 +22,7 @@ model_urls = {
 def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained_backbone=True):
     if 'divnorm' in backbone_name:
         resnet_name = backbone_name.split("_")[0]
+        layer_name = backbone_name.split("_")[1]
         use_exh_inh = True if 'ei' in backbone_name else False
         if use_exh_inh:
             backbone = resnet_divnorm.__dict__[resnet_name](
@@ -29,14 +30,16 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
                 pretrained=pretrained_backbone,
                 replace_stride_with_dilation=[False, True, True], 
                 divnorm_fsize=divnorm_fsize, 
-                use_exc_inh=True)
+                use_exc_inh=True
+            )
         else:
             backbone = resnet_divnorm.__dict__[resnet_name](
                 backbone_name=backbone_name,
                 pretrained=pretrained_backbone,
                 replace_stride_with_dilation=[False, True, True], 
                 divnorm_fsize=divnorm_fsize, 
-                use_exc_inh=False)
+                use_exc_inh=False
+            )
 
         out_layer = 'layer4'
         out_inplanes = 2048
@@ -75,7 +78,6 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
     model = base_model(backbone, classifier, aux_classifier)
     return model
 
-
 def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss, divnorm_fsize, **kwargs):
     if pretrained:
         aux_loss = True
@@ -85,7 +87,6 @@ def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss
         _load_weights(model, arch_type, backbone, progress)
     return model
 
-
 def _load_weights(model, arch_type, backbone, progress):
     arch = arch_type + '_' + backbone + '_coco'
     model_url = model_urls.get(arch, None)
@@ -94,7 +95,6 @@ def _load_weights(model, arch_type, backbone, progress):
     else:
         state_dict = load_state_dict_from_url(model_url, progress=progress)
         model.load_state_dict(state_dict)
-
 
 def fcn_resnet50(pretrained=False, progress=True,
                  num_classes=21, aux_loss=None, **kwargs):
@@ -108,7 +108,6 @@ def fcn_resnet50(pretrained=False, progress=True,
     """
     return _load_model('fcn', 'resnet50', pretrained, progress, num_classes, aux_loss, **kwargs)
 
-
 def fcn_resnet101(pretrained=False, progress=True,
                   num_classes=21, aux_loss=None, **kwargs):
     """Constructs a Fully-Convolutional Network model with a ResNet-101 backbone.
@@ -121,7 +120,6 @@ def fcn_resnet101(pretrained=False, progress=True,
     """
     return _load_model('fcn', 'resnet101', pretrained, progress, num_classes, aux_loss, **kwargs)
 
-
 def deeplabv3_resnet50(pretrained=False, progress=True,
                        num_classes=21, aux_loss=None, **kwargs):
     """Constructs a DeepLabV3 model with a ResNet-50 backbone.
@@ -133,7 +131,6 @@ def deeplabv3_resnet50(pretrained=False, progress=True,
         aux_loss (bool): If True, it uses an auxiliary loss
     """
     return _load_model('deeplabv3', 'resnet50', pretrained, progress, num_classes, aux_loss, **kwargs)
-
 
 def deeplabv3_resnet101(pretrained=False, progress=True,
                         num_classes=21, aux_loss=None, **kwargs):

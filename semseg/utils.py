@@ -3,6 +3,7 @@ import errno
 import os
 import time
 from collections import defaultdict, deque
+import numpy as np
 
 import torch
 import torch.distributed as dist
@@ -98,6 +99,23 @@ class ConfusionMatrix:
             return
         torch.distributed.barrier()
         torch.distributed.all_reduce(self.mat)
+
+    def get_mean_iou(self):
+        acc_global, acc, iu = self.compute()
+        return iu.mean().item() * 100
+    
+    def get_class_iou(self):
+        acc_global, acc, iu = self.compute()
+        return [i for i in (iu * 100).tolist()]
+
+    def get_acc_global(self):
+        acc_global, acc, iu = self.compute()
+        return acc_global.item() * 100
+        
+
+    def get_acc(self):
+        acc_global, acc, iu = self.compute()
+        return [i for i in (acc * 100).tolist()]
 
     def __str__(self):
         acc_global, acc, iu = self.compute()
@@ -263,9 +281,14 @@ def is_main_process():
     return get_rank() == 0
 
 
-def save_on_master(*args, **kwargs):
+def save_checkpoint(*args, **kwargs):
     if is_main_process():
         torch.save(*args, **kwargs)
+
+
+def save_np_image(file, arr, allow_pickle=True, fix_imports=True):
+    if is_main_process():
+        np.save(file, arr, allow_pickle=True, fix_imports=True)
 
 
 def init_distributed_mode(args):

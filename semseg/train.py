@@ -1,6 +1,7 @@
 import datetime
 import os
 import time
+import csv
 
 import presets
 import torch
@@ -9,6 +10,10 @@ import torchvision
 import utils
 from coco_utils import get_coco
 from torch import nn
+import transforms
+import numpy as np
+
+from models.segmentation.segmentation import _load_model as load_model
 
 try:
     from torchvision import prototype
@@ -55,18 +60,40 @@ def evaluate(model, data_loader, device, num_classes):
     model.eval()
     confmat = utils.ConfusionMatrix(num_classes)
     metric_logger = utils.MetricLogger(delimiter="  ")
+    class_iou_image = list()
+    img_list = list()
+    target_list = list()
+    prediction_list = list()
+
     header = "Evaluate:"
     with torch.inference_mode():
         for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
+            
+            confmat_image = utils.ConfusionMatrix(num_classes)
+
             output = model(image)
             output = output["out"]
 
+            inv_normalize = transforms.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+            img_npy = inv_normalize(image[0], target)[0].cpu().detach().numpy()
+            target_npy = target.cpu().detach().numpy()
+            prediction_npy = output.cpu().detach().numpy()
+
+            img_list.append(img_npy)
+            target_list.append(target_npy)
+            prediction_list.append(prediction_npy)
+
+
             confmat.update(target.flatten(), output.argmax(1).flatten())
+            confmat_image.update(target.flatten(), output.argmax(1).flatten())
+            
+            class_iou_image.append(confmat_image.get_class_iou())
+            confmat_image.reduce_from_all_processes()
 
         confmat.reduce_from_all_processes()
 
-    return confmat
+    return confmat, class_iou_image, img_list, target_list, prediction_list
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, scaler=None):
     model.train()
@@ -97,7 +124,8 @@ def main(args):
         raise ImportError("The prototype module couldn't be found. Please install the latest torchvision nightly.")
     if not args.prototype and args.weights:
         raise ValueError("The weights parameter works only in prototype mode. Please pass the --prototype argument.")
-    if args.output_dir:
+    if args.output_dir: 
+        args.output_dir = os.path.join("outputs", args.output_dir)
         utils.mkdir(args.output_dir)
 
     utils.init_distributed_mode(args)
@@ -128,16 +156,16 @@ def main(args):
         dataset_test, batch_size=1, sampler=test_sampler, num_workers=args.workers, collate_fn=utils.collate_fn
     )
 
-    if not args.prototype:
-        model = torchvision.models.segmentation.__dict__[args.model](
-            pretrained=args.pretrained,
-            num_classes=num_classes,
-            aux_loss=args.aux_loss,
-        )
-    else:
-        model = prototype.models.segmentation.__dict__[args.model](
-            weights=args.weights, num_classes=num_classes, aux_loss=args.aux_loss
-        )
+    model = load_model(
+        arch_type=args.arch, 
+        backbone=args.backbone, 
+        pretrained=args.pretrained, 
+        progress=True, 
+        num_classes=num_classes, 
+        aux_loss=args.aux_loss, 
+        divnorm_fsize=5,
+    )
+
     model.to(device)
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -200,12 +228,52 @@ def main(args):
         return
 
     start_time = time.time()
+
+    eval_mean_iou_path = os.path.join(args.output_dir, "eval_mean_iou.csv") # epoch eval mean IoU 
+
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, scaler)
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
+        confmat, class_iou_image, img_list, target_list, prediction_list = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
         print(confmat)
+
+        mean_iou = confmat.get_mean_iou()
+        
+        args.output_epoch_dir = os.path.join(args.output_dir, f"epoch_{epoch}")
+        utils.mkdir(args.output_epoch_dir)
+        args.output_epoch_images_dir = os.path.join(args.output_epoch_dir, "images")
+        utils.mkdir(args.output_epoch_images_dir)
+        args.output_epoch_image_dir = os.path.join(args.output_epoch_images_dir, "image")
+        utils.mkdir(args.output_epoch_image_dir)
+        args.output_epoch_target_dir = os.path.join(args.output_epoch_images_dir, "target")
+        utils.mkdir(args.output_epoch_target_dir)
+        args.output_epoch_prediction_dir = os.path.join(args.output_epoch_images_dir, "prediction")
+        utils.mkdir(args.output_epoch_prediction_dir)
+
+        eval_class_iou_per_image_path = os.path.join(args.output_epoch_dir, f"eval_class_iou_per_image_epoch_{epoch}.csv") # epoch eval class IoU per image
+
+        # open the file in the write mode
+        with open(eval_mean_iou_path, 'a', newline='') as f:
+            # create the csv writer
+            writer = csv.writer(f)
+            # write a row to the csv file
+            writer.writerow([mean_iou])
+        f.close()
+
+        # open the file in the write mode
+        with open(eval_class_iou_per_image_path, 'a', newline='') as f:
+            # create the csv writer
+            writer = csv.writer(f)
+            # write a row to the csv file
+            writer.writerow(class_iou_image)
+        f.close()
+
+        for i, (img, target, prediction) in enumerate(zip(img_list, target_list, prediction_list)):
+            utils.save_np_image(os.path.join(args.output_epoch_image_dir, f"{i}.npy"), img)
+            utils.save_np_image(os.path.join(args.output_epoch_target_dir, f"{i}.npy"), target)
+            utils.save_np_image(os.path.join(args.output_epoch_prediction_dir, f"{i}.npy"), prediction)
+
         checkpoint = {
             "model": model_without_ddp.state_dict(),
             "optimizer": optimizer.state_dict(),
@@ -213,10 +281,11 @@ def main(args):
             "epoch": epoch,
             "args": args,
         }
+
         if args.amp:
             checkpoint["scaler"] = scaler.state_dict()
-        utils.save_on_master(checkpoint, os.path.join(args.output_dir, f"model_{epoch}.pth"))
-        utils.save_on_master(checkpoint, os.path.join(args.output_dir, "checkpoint.pth"))
+        utils.save_checkpoint(checkpoint, os.path.join(args.output_epoch_dir, f"model_{epoch}.pth"))
+        utils.save_checkpoint(checkpoint, os.path.join(args.output_dir, "checkpoint.pth"))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -227,9 +296,10 @@ def get_args_parser(add_help=True):
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training", add_help=add_help)
 
-    parser.add_argument("--data-path", default="/datasets01/COCO/022719/", type=str, help="dataset path")
-    parser.add_argument("--dataset", default="coco", type=str, help="dataset name")
-    parser.add_argument("--model", default="fcn_resnet101", type=str, help="model name")
+    parser.add_argument("--data-path", default="/home/AD/rraina/segmentation_benchmark/benchmark_RELEASE", type=str, help="dataset path")
+    parser.add_argument("--dataset", default="voc_aug", type=str, help="dataset name")
+    parser.add_argument("--arch", default="deeplabv3", type=str, help="model name")
+    parser.add_argument("--backbone", default="resnet50", type=str, help="backbone name")
     parser.add_argument("--aux-loss", action="store_true", help="auxiliar loss")
     parser.add_argument("--device", default="cuda", type=str, help="device (Use cuda or cpu Default: cuda)")
     parser.add_argument(
@@ -255,7 +325,7 @@ def get_args_parser(add_help=True):
     parser.add_argument("--lr-warmup-method", default="linear", type=str, help="the warmup method (default: linear)")
     parser.add_argument("--lr-warmup-decay", default=0.01, type=float, help="the decay for lr")
     parser.add_argument("--print-freq", default=10, type=int, help="print frequency")
-    parser.add_argument("--output-dir", default=".", type=str, help="path to save outputs")
+    parser.add_argument("--output-dir", default="/home/AD/rraina/segmentation_benchmark/semseg/outputs", type=str, help="path to save outputs")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
     parser.add_argument(
