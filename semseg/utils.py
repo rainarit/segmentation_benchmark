@@ -4,6 +4,7 @@ import os
 import time
 from collections import defaultdict, deque
 import numpy as np
+import shutil
 
 import torch
 import torch.distributed as dist
@@ -281,9 +282,10 @@ def is_main_process():
     return get_rank() == 0
 
 
-def save_checkpoint(*args, **kwargs):
-    if is_main_process():
-        torch.save(*args, **kwargs)
+def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'model_best.pth.tar')
 
 
 def save_np_image(file, arr, allow_pickle=True, fix_imports=True):

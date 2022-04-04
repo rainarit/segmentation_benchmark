@@ -1,22 +1,19 @@
 import argparse
 import os
 import random
-from optim import LARS
-import sys
-import string
+import shutil
 import time
 import warnings
-import math
-import numpy as np
-import json
+from enum import Enum
+import csv
 
 import torch
-from pathlib import Path
 import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.optim
+from torch.optim.lr_scheduler import StepLR
 import torch.multiprocessing as mp
 import torch.utils.data
 import torch.utils.data.distributed
@@ -24,31 +21,27 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
-
-from torch.utils.tensorboard import SummaryWriter
-
-import models.resnet_divnorm as models_resnet_divnorm
-import utils
-
-seed = 34
-np.random.seed(seed)
-torch.manual_seed(seed)
-
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
-                    help='path to dataset')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18')
+parser.add_argument('--data', metavar='DIR', default='imagenet',
+                    help='path to dataset (default: imagenet)')
+parser.add_argument('--output-dir', metavar='DIR',
+                    help='path to model directory')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
+                    choices=model_names,
+                    help='model architecture: ' +
+                        ' | '.join(model_names) +
+                        ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=1024, type=int,
+parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
@@ -57,7 +50,7 @@ parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--wd', '--weight-decay', default=1e-6, type=float,
+parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
@@ -80,9 +73,6 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
-parser.add_argument('--inplanes', default=64, type=int,
-                    help='Number of inplanes (conv1 - ResNet)')
-parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
@@ -90,29 +80,10 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'multi node data parallel training')
 
 best_acc1 = 0
-global_stats_file = None
-"""NOTE:
-If you are using NCCL backend, remember to set 
-the following environment variables in your Ampere series GPU.
-
-export NCCL_DEBUG=INFO
-export NCCL_DEBUG_SUBSYS=ALL
-export NCCL_IB_DISABLE=1
-export NCCL_P2P_DISABLE=1
-export NCCL_SOCKET_IFNAME=eth0
-"""
-
-
-def generate_rand_string(n):
-  letters = string.ascii_lowercase
-  str_rand = ''.join(random.choice(letters) for i in range(n))
-  return str_rand
 
 
 def main():
     args = parser.parse_args()
-    args.checkpoint_dir = Path("checkpoints_%s/%s" % (args.data.split("/")[-1], generate_rand_string(6)))
-    args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -141,18 +112,12 @@ def main():
         # Use torch.multiprocessing.spawn to launch distributed processes: the
         # main_worker process function
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
-        
     else:
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
 
 
 def main_worker(gpu, ngpus_per_node, args):
-
-    # writer = SummaryWriter(str(args.tensorboard_dir))
-
-    iterator = utils.Iterator()
-
     global best_acc1
     args.gpu = gpu
 
@@ -168,43 +133,13 @@ def main_worker(gpu, ngpus_per_node, args):
             args.rank = args.rank * ngpus_per_node + gpu
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
-
-    if args.rank == 0:
-        stats_file = open(args.checkpoint_dir / 'stats.txt', 'a', buffering=1)
-        global_stats_file = stats_file
-        args.global_stats_file = global_stats_file
-        print(' '.join(sys.argv))
-        print(' '.join(sys.argv), file=global_stats_file)
-
     # create model
-    if 'imagenet_100' in args.data:
-        num_classes = 100
-    else:
-        num_classes = 1000
-    
-    if args.rank == 0:
-        print("%s-way classification" % num_classes)
-
     if args.pretrained:
         print("=> using pre-trained model '{}'".format(args.arch))
-        if "divnorm" in str(args.arch):
-            model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=True, residual_divnorm=True, inplanes=args.inplanes, num_classes=num_classes)
-        else:
-            model = models.__dict__[args.arch](pretrained=True, num_classes=num_classes)
+        model = models.__dict__[args.arch](pretrained=True)
     else:
         print("=> creating model '{}'".format(args.arch))
-        if "divnorm" in str(args.arch):
-            model_name = str(args.arch).replace("_divnorm", "")
-            model = models_resnet_divnorm.__dict__[model_name](pretrained=False, residual_divnorm=True, inplanes=args.inplanes, num_classes=num_classes)
-        else:
-            model = models.__dict__[args.arch](pretrained=False, num_classes=num_classes)
-            print("Created resnet with %s classes" % model.fc.out_features)
-    
-    model = model.half()
-    for module in model.modules():
-        if isinstance(module, nn.BatchNorm2d):
-            module = module.float()
+        model = models.__dict__[args.arch]()
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -214,13 +149,10 @@ def main_worker(gpu, ngpus_per_node, args):
         # DistributedDataParallel will use all available devices.
         if args.gpu is not None:
             torch.cuda.set_device(args.gpu)
-            torch.backends.cudnn.benchmark = True
-            # model.cuda(args.gpu)
-            model = model.cuda(args.gpu)
-            model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            model.cuda(args.gpu)
             # When using a single GPU per process and per
             # DistributedDataParallel, we need to divide the batch size
-            # ourselves based on the total number of GPUs we have
+            # ourselves based on the total number of GPUs of the current node.
             args.batch_size = int(args.batch_size / ngpus_per_node)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
@@ -240,16 +172,16 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             model = torch.nn.DataParallel(model).cuda()
 
-    # define loss function (criterion) and optimizer
+    # define loss function (criterion), optimizer, and learning rate scheduler
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
-    # optimizer = torch.optim.SGD(model.parameters(), args.lr,
-    #                             momentum=args.momentum,
-    #                             weight_decay=args.weight_decay)
-    optimizer = LARS(model.parameters(), lr=0, weight_decay=args.weight_decay,
-                     weight_decay_filter=True,
-                     lars_adaptation_filter=True)
-
+    optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                                momentum=args.momentum,
+                                weight_decay=args.weight_decay)
+    
+    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+    
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
@@ -267,15 +199,20 @@ def main_worker(gpu, ngpus_per_node, args):
                 best_acc1 = best_acc1.to(args.gpu)
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
+            scheduler.load_state_dict(checkpoint['scheduler'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
+    cudnn.benchmark = True
+
     # Data loading code
+    outputdir = os.path.join('output', args.output_dir)
+    os.makedirs(outputdir, exist_ok=True)
+
     traindir = os.path.join(args.data, 'train')
     valdir = os.path.join(args.data, 'val')
-
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -288,6 +225,15 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize,
         ]))
 
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    else:
+        train_sampler = None
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(valdir, transforms.Compose([
             transforms.Resize(256),
@@ -297,72 +243,59 @@ def main_worker(gpu, ngpus_per_node, args):
         ])),
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
-    
 
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    else:
-        train_sampler = None
+    if args.evaluate:
+        validate(val_loader, model, criterion, args)
+        return
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    top_avg = list()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        # adjust_learning_rate(optimizer, epoch, args)
-        if epoch == 0:
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                        and args.rank == 0):
-                    state = dict(epoch=epoch + 1, model=model.state_dict(),
-                                optimizer=optimizer.state_dict())
-                    torch.save(state, '%s/checkpoint_%s.pth' % (args.checkpoint_dir, str(args.arch)))
+
         # train for one epoch
-        acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer=None, iterator=iterator)
-        val_acc1, val_acc5 = validate(val_loader, model, criterion, optimizer, epoch, args)
+        train(train_loader, model, criterion, optimizer, epoch, args)
+
+        # evaluate on validation set
+        acc1, acc5 = validate(val_loader, model, criterion, args)
+        top_avg.append(f'{acc1},{acc5}')
+        
+        scheduler.step()
+
+        
         # remember best acc@1 and save checkpoint
-        is_best = val_acc1 > best_acc1
-        best_acc1 = max(val_acc1, best_acc1)
-        
-        stats = dict(epoch=epoch,
-                    lr_weights=optimizer.param_groups[0]['lr'],
-                    val_acc1=val_acc1.item())
-        print(json.dumps(stats))
-        # print(json.dumps(stats), file=args.global_stats_file)
+        is_best = acc1 > best_acc1
+        best_acc1 = max(acc1, best_acc1)
 
-        # writer.add_scalar("Train/Best_Acc1", best_acc1, epoch)
-        state = {
-                    'epoch': epoch + 1,
-                    'arch': args.arch,
-                    'state_dict': model.state_dict(),
-                    'best_acc1_train': best_acc1,
-                    'optimizer' : optimizer.state_dict(),
-                }
-        if epoch > (args.epochs - 10):
-            # store only last ten epoch weights
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                    and args.rank == 0):
-                state = dict(epoch=epoch + 1, model=model.state_dict(),
-                         optimizer=optimizer.state_dict())
-                torch.save(state, "%s/checkpoint_%s_epoch_%s.pth" % (args.checkpoint_dir, str(args.arch), epoch))
-        else:
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                    and args.rank == 0):
-                state = dict(epoch=epoch + 1, model=model.state_dict(),
-                            optimizer=optimizer.state_dict())
-                torch.save(state, '%s/checkpoint_%s.pth' % (args.checkpoint_dir, str(args.arch)))
-        
-        if is_best:
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                    and args.rank == 0):
-                print("Saving best model, val_acc = %s" % (val_acc1.item()))
-                state = dict(epoch=epoch + 1, model=model.state_dict(),
-                            optimizer=optimizer.state_dict(), val_acc1=val_acc1.item())
-                torch.save(state, '%s/checkpoint_best_%s.pth' % (args.checkpoint_dir, str(args.arch)))
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % ngpus_per_node == 0):
+            filename = os.path.join(outputdir, f'epoch_{epoch}_checkpoint.pth')
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'best_acc1': best_acc1,
+                'optimizer' : optimizer.state_dict(),
+                'scheduler' : scheduler.state_dict()
+            }, filename=filename)
+            if is_best:
+                filename = os.path.join(outputdir, 'model_best.pth')
+                save_checkpoint({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'best_acc1': best_acc1,
+                'optimizer' : optimizer.state_dict(),
+                'scheduler' : scheduler.state_dict()
+                }, filename=filename)
 
-        
-def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator):
-    del writer  # unused here
+    top_avg_path = os.path.join(outputdir, 'top_avg.csv')
+    with open(top_avg_path, 'w') as file:
+        writer = csv.writer(file)
+        writer.writerow(top_avg)
+
+
+def train(train_loader, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -377,85 +310,43 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
     model.train()
 
     end = time.time()
-
-    # Creates once at the beginning of training
-    # scaler = torch.cuda.amp.GradScaler()
-
     for i, (images, target) in enumerate(train_loader):
-        images = images.half()
         # measure data loading time
         data_time.update(time.time() - end)
-        # adjust learning rate at every step with warmup + cosine LR decay
-        adjust_learning_rate_cosine(args, optimizer, train_loader, i + epoch * len(train_loader))
 
         if args.gpu is not None:
             images = images.cuda(args.gpu, non_blocking=True)
         if torch.cuda.is_available():
             target = target.cuda(args.gpu, non_blocking=True)
 
-        # Casts operations to mixed precision
-        optimizer.zero_grad()
-        # with torch.cuda.amp.autocast():
+        # compute output
         output = model(images)
         loss = criterion(output, target)
-            # RELEASE below lines for no nan loss training
-            # loss = criterion(output.float(), target)
-        if torch.isnan(loss):
-            if args.rank == 0:
-                for k, v in model.named_parameters():
-                    print("%s, %s" % (k, v.mean()), file=args.global_stats_file)
-                import ipdb; ipdb.set_trace()
+
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
         losses.update(loss.item(), images.size(0))
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
-        
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        # scaler.scale(loss).backward()
-        # scaler.step(optimizer)
-        # scaler.update()
-        
-        if args.rank == 0:
-            # Clamping parameters of divnorm to non-negative values
-            if "divnorm" in str(args.arch):
-                if args.multiprocessing_distributed:
-                    div_conv_weight = model.module.div.div.weight.data
-                    div_conv_weight = div_conv_weight.clamp(min=0.)
-                    model.module.div.div.weight.data = div_conv_weight
-                else:
-                    div_conv_weight = model.div.div.weight.data
-                    div_conv_weight = div_conv_weight.clamp(min=0.)
-                    model.div.div.weight.data = div_conv_weight
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % args.print_freq == 0:
-            if args.rank == 0:
-                stats = dict(epoch=epoch, step=i,
-                            lr_weights=optimizer.param_groups[0]['lr'],
-                            loss=loss.item(),
-                            acc1=acc1.item())
-                print("FC mean: ", model.module.fc.weight.mean(), file=args.global_stats_file)
-                print("Output min max: ", output.min(), output.max(), file=args.global_stats_file)
-                print(json.dumps(stats))
-                print(json.dumps(stats), file=args.global_stats_file)
+            progress.display(i)
 
-        # writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        # writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
-        # writer.flush()
 
-        iterator.add_train()
-    return top1.avg
-
-def validate(val_loader, model, criterion, optimizer, epoch, args):
-    batch_time = AverageMeter('Time', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
+def validate(val_loader, model, criterion, args):
+    batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
+    losses = AverageMeter('Loss', ':.4e', Summary.NONE)
+    top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
+    top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
     progress = ProgressMeter(
         len(val_loader),
         [batch_time, losses, top1, top5],
@@ -467,12 +358,12 @@ def validate(val_loader, model, criterion, optimizer, epoch, args):
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
-            images = images.half()
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
             if torch.cuda.is_available():
                 target = target.cuda(args.gpu, non_blocking=True)
 
+            # compute output
             output = model(images)
             loss = criterion(output, target)
 
@@ -489,17 +380,26 @@ def validate(val_loader, model, criterion, optimizer, epoch, args):
             if i % args.print_freq == 0:
                 progress.display(i)
 
-        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
-            .format(top1=top1, top5=top5))
+        progress.display_summary()
 
     return top1.avg, top5.avg
 
 
+def save_checkpoint(state, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+
+class Summary(Enum):
+    NONE = 0
+    AVERAGE = 1
+    SUM = 2
+    COUNT = 3
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f'):
+    def __init__(self, name, fmt=':f', summary_type=Summary.AVERAGE):
         self.name = name
         self.fmt = fmt
+        self.summary_type = summary_type
         self.reset()
 
     def reset(self):
@@ -517,6 +417,21 @@ class AverageMeter(object):
     def __str__(self):
         fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
         return fmtstr.format(**self.__dict__)
+    
+    def summary(self):
+        fmtstr = ''
+        if self.summary_type is Summary.NONE:
+            fmtstr = ''
+        elif self.summary_type is Summary.AVERAGE:
+            fmtstr = '{name} {avg:.3f}'
+        elif self.summary_type is Summary.SUM:
+            fmtstr = '{name} {sum:.3f}'
+        elif self.summary_type is Summary.COUNT:
+            fmtstr = '{name} {count:.3f}'
+        else:
+            raise ValueError('invalid summary type %r' % self.summary_type)
+        
+        return fmtstr.format(**self.__dict__)
 
 
 class ProgressMeter(object):
@@ -529,34 +444,16 @@ class ProgressMeter(object):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
         print('\t'.join(entries))
+        
+    def display_summary(self):
+        entries = [" *"]
+        entries += [meter.summary() for meter in self.meters]
+        print(' '.join(entries))
 
     def _get_batch_fmtstr(self, num_batches):
         num_digits = len(str(num_batches // 1))
         fmt = '{:' + str(num_digits) + 'd}'
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
-
-def adjust_learning_rate(optimizer, epoch, args):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = args.lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
-
-def adjust_learning_rate_cosine(args, optimizer, loader, step):
-    max_steps = args.epochs * len(loader)
-    warmup_steps = 10 * len(loader)
-    base_lr = args.batch_size / 256
-    if step < warmup_steps:
-        lr = base_lr * step / warmup_steps
-    else:
-        step -= warmup_steps
-        max_steps -= warmup_steps
-        q = 0.5 * (1 + math.cos(math.pi * step / max_steps))
-        end_lr = base_lr * 0.001
-        lr = base_lr * q + end_lr * (1 - q)
-    optimizer.param_groups[0]['lr'] = lr * args.lr
-    
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""

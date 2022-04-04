@@ -2,6 +2,7 @@ import datetime
 import os
 import time
 import csv
+import shutil
 
 import presets
 import torch
@@ -19,6 +20,8 @@ try:
     from torchvision import prototype
 except ImportError:
     prototype = None
+
+best_acc = 0
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -83,7 +86,6 @@ def evaluate(model, data_loader, device, num_classes):
             img_list.append(img_npy)
             target_list.append(target_npy)
             prediction_list.append(prediction_npy)
-
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
             confmat_image.update(target.flatten(), output.argmax(1).flatten())
@@ -231,61 +233,53 @@ def main(args):
 
     eval_mean_iou_path = os.path.join(args.output_dir, "eval_mean_iou.csv") # epoch eval mean IoU 
 
-    for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
-            train_sampler.set_epoch(epoch)
-        train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, scaler)
-        confmat, class_iou_image, img_list, target_list, prediction_list = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
-        print(confmat)
 
-        mean_iou = confmat.get_mean_iou()
-        
-        args.output_epoch_dir = os.path.join(args.output_dir, f"epoch_{epoch}")
-        utils.mkdir(args.output_epoch_dir)
-        args.output_epoch_images_dir = os.path.join(args.output_epoch_dir, "images")
-        utils.mkdir(args.output_epoch_images_dir)
-        args.output_epoch_image_dir = os.path.join(args.output_epoch_images_dir, "image")
-        utils.mkdir(args.output_epoch_image_dir)
-        args.output_epoch_target_dir = os.path.join(args.output_epoch_images_dir, "target")
-        utils.mkdir(args.output_epoch_target_dir)
-        args.output_epoch_prediction_dir = os.path.join(args.output_epoch_images_dir, "prediction")
-        utils.mkdir(args.output_epoch_prediction_dir)
+    with open(eval_mean_iou_path, 'w') as f:
+        writer = csv.writer(f)
+        for epoch in range(args.start_epoch, args.epochs):
+            if args.distributed:
+                train_sampler.set_epoch(epoch)
+            train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, scaler)
+            confmat, class_iou_image, img_list, target_list, prediction_list = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
+            print(confmat)
+            print(class_iou_image)
 
-        eval_class_iou_per_image_path = os.path.join(args.output_epoch_dir, f"eval_class_iou_per_image_epoch_{epoch}.csv") # epoch eval class IoU per image
-
-        # open the file in the write mode
-        with open(eval_mean_iou_path, 'a', newline='') as f:
-            # create the csv writer
-            writer = csv.writer(f)
-            # write a row to the csv file
+            mean_iou = confmat.get_mean_iou()
             writer.writerow([mean_iou])
-        f.close()
+            
+            args.output_epoch_dir = os.path.join(args.output_dir, f"epoch_{epoch}")
+            utils.mkdir(args.output_epoch_dir)
+            args.output_epoch_images_dir = os.path.join(args.output_epoch_dir, "images")
+            utils.mkdir(args.output_epoch_images_dir)
+            args.output_epoch_image_dir = os.path.join(args.output_epoch_images_dir, "image")
+            utils.mkdir(args.output_epoch_image_dir)
+            args.output_epoch_target_dir = os.path.join(args.output_epoch_images_dir, "target")
+            utils.mkdir(args.output_epoch_target_dir)
+            args.output_epoch_prediction_dir = os.path.join(args.output_epoch_images_dir, "prediction")
+            utils.mkdir(args.output_epoch_prediction_dir)
 
-        # open the file in the write mode
-        with open(eval_class_iou_per_image_path, 'a', newline='') as f:
-            # create the csv writer
-            writer = csv.writer(f)
-            # write a row to the csv file
-            writer.writerow(class_iou_image)
-        f.close()
+            eval_class_iou_per_image_path = os.path.join(args.output_epoch_dir, f"eval_class_iou_per_image_epoch_{epoch}.csv") # epoch eval class IoU per image
+            with open(eval_class_iou_per_image_path, 'w', newline='\n') as f:
+                writer_per_image = csv.writer(f)
+                writer_per_image.writerow(class_iou_image)
 
-        for i, (img, target, prediction) in enumerate(zip(img_list, target_list, prediction_list)):
-            utils.save_np_image(os.path.join(args.output_epoch_image_dir, f"{i}.npy"), img)
-            utils.save_np_image(os.path.join(args.output_epoch_target_dir, f"{i}.npy"), target)
-            utils.save_np_image(os.path.join(args.output_epoch_prediction_dir, f"{i}.npy"), prediction)
+            for i, (img, target, prediction) in enumerate(zip(img_list, target_list, prediction_list)):
+                utils.save_np_image(os.path.join(args.output_epoch_image_dir, f"{i}.npy"), img)
+                utils.save_np_image(os.path.join(args.output_epoch_target_dir, f"{i}.npy"), target)
+                utils.save_np_image(os.path.join(args.output_epoch_prediction_dir, f"{i}.npy"), prediction)
 
-        checkpoint = {
-            "model": model_without_ddp.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "lr_scheduler": lr_scheduler.state_dict(),
-            "epoch": epoch,
-            "args": args,
-        }
+            checkpoint = {
+                "model": model_without_ddp.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "lr_scheduler": lr_scheduler.state_dict(),
+                "epoch": epoch,
+                "args": args,
+            }
 
-        if args.amp:
-            checkpoint["scaler"] = scaler.state_dict()
-        utils.save_checkpoint(checkpoint, os.path.join(args.output_epoch_dir, f"model_{epoch}.pth"))
-        utils.save_checkpoint(checkpoint, os.path.join(args.output_dir, "checkpoint.pth"))
+            if args.amp:
+                checkpoint["scaler"] = scaler.state_dict()
+            is_best = mean_iou > best_acc
+            utils.save_checkpoint(state=checkpoint, is_best=is_best, filename=os.path.join(args.output_epoch_dir, f"model_{epoch}.pth"))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
