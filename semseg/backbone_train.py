@@ -21,6 +21,8 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+import models.resnet_divnorm as models_resnet_divnorm
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -30,11 +32,7 @@ parser.add_argument('--data', metavar='DIR', default='imagenet',
                     help='path to dataset (default: imagenet)')
 parser.add_argument('--output-dir', metavar='DIR',
                     help='path to model directory')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
-                    choices=model_names,
-                    help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: resnet18)')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=90, type=int, metavar='N',
@@ -134,12 +132,15 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
     # create model
-    if args.pretrained:
-        print("=> using pre-trained model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](pretrained=True)
+    print("=> creating model '{}'".format(args.arch))
+    if "divnormei" in str(args.arch):
+        model_name = str(args.arch).replace("_divnormei", "")
+        model = models_resnet_divnorm.__dict__[model_name](num_classes=100, use_exc_inh=True, backbone_name=args.arch, pretrained=False)
+    elif "divnorm" in str(args.arch):
+        model_name = str(args.arch).replace("_divnorm", "")
+        model = models_resnet_divnorm.__dict__[model_name](num_classes=100, backbone_name=args.arch, pretrained=False)
     else:
-        print("=> creating model '{}'".format(args.arch))
-        model = models.__dict__[args.arch]()
+        model = models.__dict__[args.arch](pretrained=False)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -192,14 +193,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 # Map model to be loaded to specified single gpu.
                 loc = 'cuda:{}'.format(args.gpu)
                 checkpoint = torch.load(args.resume, map_location=loc)
-            args.start_epoch = checkpoint['epoch']
-            best_acc1 = checkpoint['best_acc1']
-            if args.gpu is not None:
-                # best_acc1 may be from a checkpoint from a different GPU
-                best_acc1 = best_acc1.to(args.gpu)
+                checkpoint['state_dict'] = {k.replace("module.", ""): v for k, v in checkpoint['state_dict'].items()}
             model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            scheduler.load_state_dict(checkpoint['scheduler'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
@@ -208,7 +203,7 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    outputdir = os.path.join('output', args.output_dir)
+    outputdir = os.path.join('outputs', args.output_dir)
     os.makedirs(outputdir, exist_ok=True)
 
     traindir = os.path.join(args.data, 'train')
@@ -262,7 +257,6 @@ def main_worker(gpu, ngpus_per_node, args):
         
         scheduler.step()
 
-        
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
@@ -364,7 +358,7 @@ def validate(val_loader, model, criterion, args):
                 target = target.cuda(args.gpu, non_blocking=True)
 
             # compute output
-            output = model(images)
+            output = model(images)['out']
             loss = criterion(output, target)
 
             # measure accuracy and record loss

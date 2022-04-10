@@ -350,7 +350,6 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             torch.save(state, "checkpoint_%s.pth" % args.arch)
 
-=======
         acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer=None, iterator=iterator)
         val_acc1, val_acc5 = validate(val_loader, model, criterion, optimizer, epoch, args)
         # remember best acc@1 and save checkpoint

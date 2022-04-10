@@ -37,14 +37,9 @@ class ExcInhDivNorm(nn.Module):
 
     def __init__(self,
                  in_channels,
-                 l_filter_size,
-                 l_theta, 
-                 l_sfs,
-                 l_phase,
                  divnorm_fsize=5,
                  exc_fsize=7,
                  inh_fsize=5,
-                 stride=4,
                  padding_mode='zeros',
                  groups=1,
                  device='cuda',
@@ -72,6 +67,7 @@ class ExcInhDivNorm(nn.Module):
         self.sigma = nn.Parameter(torch.ones([1, self.hidden_dim, 1, 1]))
         self.output_bn = nn.BatchNorm2d(in_channels)
         self.output_relu = nn.ReLU(inplace=True)
+        nonnegative_weights_init(self.div)
         
     def forward(self, x, residual=False, square_act=True, hor_conn=True):
         """
@@ -89,7 +85,7 @@ class ExcInhDivNorm(nn.Module):
             excitation = self.e_e(simple_cells)
             simple_cells = simple_cells + excitation - inhibition
         if square_act:
-            simple_cells = simple_cells ** 2
+            simple_cells = F.relu(simple_cells)
             norm = self.div(simple_cells) + self.sigma ** 2 + 1e-5
             simple_cells = simple_cells / norm
         else:
@@ -99,4 +95,6 @@ class ExcInhDivNorm(nn.Module):
         if residual:
             output += identity
         output = self.output_relu(output)
+        if torch.isinf(norm.max()):
+            import ipdb; ipdb.set_trace()
         return output

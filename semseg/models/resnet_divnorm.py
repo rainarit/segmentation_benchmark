@@ -287,8 +287,8 @@ class ResNet_DivNorm(nn.Module):
         
         return_dict['out'] = x
 
-        return return_dict
-        #return x
+        #return return_dict
+        return x
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
