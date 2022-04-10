@@ -12,9 +12,10 @@ import torch.distributed as dist
 import torch
 import torch.multiprocessing as mp
 import warnings
-from enum import Enum
-import csv
 
+import eagerpy as ep
+from foolbox import PyTorchModel, accuracy, samples
+from foolbox.attacks import *
 import numpy as np
 from tqdm import tqdm
 import os
@@ -27,8 +28,7 @@ parser = argparse.ArgumentParser(description='PyTorch FoolBox Evaluation')
 parser.add_argument('--arch', help='backbone model arch')
 parser.add_argument('--data', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('--pertubation', help='pertubation type')
-parser.add_argument('--num-classes', help='number of classes', type=int)
+parser.add_argument('--attack', help='attack type')
 parser.add_argument('--output', help='name of output dir')
 parser.add_argument('--checkpoint', help='name of checkpoint path')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
@@ -102,10 +102,10 @@ def main():
         main_worker(args.gpu, ngpus_per_node, args)
 
 def main_worker(gpu, ngpus_per_node, args):
-    print(args.data)
     args.gpu = gpu
+    attack = args.attack
     os.makedirs(args.output, exist_ok=True)
-    acc_path = os.path.join(args.output, f'{args.pertubation}.csv')
+    acc_path = os.path.join(args.output, f'{args.attack}.txt')
 
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
@@ -121,15 +121,22 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
 
     # create model
+    if 'imagenet_100' in args.data:
+        num_classes = 100
+    else:
+        num_classes = 1000
+    
+    if args.rank == 0:
+        print("%s-way classification" % num_classes)
 
     if args.pretrained:
         print("=> using pre-trained model '{}'".format(args.arch))
         model_name = str(args.arch)
-        model = models_vgg.__dict__[args.arch](pretrained=True, num_classes=args.num_classes)
+        model = models_vgg.__dict__[args.arch](pretrained=True, num_classes=num_classes)
     else:
         print("=> creating model '{}'".format(args.arch))
         model_name = str(args.arch)
-        model = models_vgg.__dict__[model_name](pretrained=False, num_classes=args.num_classes)
+        model = models_vgg.__dict__[model_name](pretrained=False, num_classes=num_classes)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -161,7 +168,7 @@ def main_worker(gpu, ngpus_per_node, args):
             model.cuda()
         else:
             model = torch.nn.DataParallel(model).cuda()
-    
+
     print("=> loading checkpoint '{}'".format(args.checkpoint))
     checkpoint = {'model': {}}
     if args.gpu is None:
@@ -175,162 +182,69 @@ def main_worker(gpu, ngpus_per_node, args):
         if 'module' not in value:
             name = 'module.' + value
             checkpoint['model'][name] = checkpoint_old['model'][value]
-    import ipdb; ipdb.set_trace()
-    model.load_state_dict(checkpoint['model'], strict=True)
+        else:
+            checkpoint['model'][value] = checkpoint_old['model'][value]
+
+    model.load_state_dict(checkpoint['model'], strict=False)
     print("=> loaded checkpoint '{}' (epoch {})".format(args.checkpoint, checkpoint_old['epoch']))
     model.eval()
 
-    val_dataset = datasets.ImageFolder(args.data, transforms.Compose([
+    preprocessing = dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], axis=-3)
+    
+    val_loader = torch.utils.data.DataLoader(
+        datasets.ImageFolder(args.data, transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(160),
-            transforms.ToTensor(),]))
+            transforms.ToTensor(),])), batch_size=1, shuffle=False)
 
-    val_dataset_100_class_to_idx = {'n01558993': 0, 'n01692333': 1, 'n01729322': 2, 'n01735189': 3, 'n01749939': 4, 
-                                    'n01773797': 5, 'n01820546': 6, 'n01855672': 7, 'n01978455': 8, 'n01980166': 9, 
-                                    'n01983481': 10, 'n02009229': 11, 'n02018207': 12, 'n02085620': 13, 'n02086240': 14, 
-                                    'n02086910': 15, 'n02087046': 16, 'n02089867': 17, 'n02089973': 18, 'n02090622': 19, 
-                                    'n02091831': 20, 'n02093428': 21, 'n02099849': 22, 'n02100583': 23, 'n02104029': 24, 
-                                    'n02105505': 25, 'n02106550': 26, 'n02107142': 27, 'n02108089': 28, 'n02109047': 29, 
-                                    'n02113799': 30, 'n02113978': 31, 'n02114855': 32, 'n02116738': 33, 'n02119022': 34, 
-                                    'n02123045': 35, 'n02138441': 36, 'n02172182': 37, 'n02231487': 38, 'n02259212': 39, 
-                                    'n02326432': 40, 'n02396427': 41, 'n02483362': 42, 'n02488291': 43, 'n02701002': 44, 
-                                    'n02788148': 45, 'n02804414': 46, 'n02859443': 47, 'n02869837': 48, 'n02877765': 49, 
-                                    'n02974003': 50, 'n03017168': 51, 'n03032252': 52, 'n03062245': 53, 'n03085013': 54, 
-                                    'n03259280': 55, 'n03379051': 56, 'n03424325': 57, 'n03492542': 58, 'n03494278': 59, 
-                                    'n03530642': 60, 'n03584829': 61, 'n03594734': 62, 'n03637318': 63, 'n03642806': 64, 
-                                    'n03764736': 65, 'n03775546': 66, 'n03777754': 67, 'n03785016': 68, 'n03787032': 69, 
-                                    'n03794056': 70, 'n03837869': 71, 'n03891251': 72, 'n03903868': 73, 'n03930630': 74, 
-                                    'n03947888': 75, 'n04026417': 76, 'n04067472': 77, 'n04099969': 78, 'n04111531': 79, 
-                                    'n04127249': 80, 'n04136333': 81, 'n04229816': 82, 'n04238763': 83, 'n04336792': 84, 
-                                    'n04418357': 85, 'n04429376': 86, 'n04435653': 87, 'n04485082': 88, 'n04493381': 89, 
-                                    'n04517823': 90, 'n04589890': 91, 'n04592741': 92, 'n07714571': 93, 'n07715103': 94, 
-                                    'n07753275': 95, 'n07831146': 96, 'n07836838': 97, 'n13037406': 98, 'n13040303': 99}
+    fmodel = PyTorchModel(model, bounds=(0, 1), preprocessing=preprocessing, device="cuda")
 
-    val_dataset.samples = []
-    for cls, index in val_dataset_100_class_to_idx.items():
-        dir_path = str(args.data)+str(cls)
-        for filename in os.listdir(dir_path):
-            f = os.path.join(dir_path, filename)
-            # checking if it is a file
-            if os.path.isfile(f):
-                val_dataset.samples.append((str(f), index))
-    
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, num_workers= args.workers, shuffle=False, pin_memory=True)
+    # apply the attack
+    attack = globals()[attack]()
+    epsilons = [
+        0.0000,
+        0.0002,
+        0.0004,
+        0.0006,
+        0.0008,
+        0.0010,
+        0.0012,
+        0.0014,
+        0.0016,
+        0.0018,
+        0.0020,
+    ]
 
-    top1_avg, top5_avg = validate(val_loader, model, args)
-    with open(acc_path, "w") as file:
-            writer = csv.writer(file, delimiter=',')
-            writer.writerow([float(top1_avg), float(top5_avg)])
-    
+    clean_acc, robust_acc = validate(fmodel=fmodel, val_loader=val_loader, attack=attack, epsilons=epsilons)
 
-def validate(val_loader, model, args):
-    top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
-    top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
-    progress = ProgressMeter(
-        len(val_loader),
-        [top1, top5],
-        prefix='Test: ')
+    f = open(acc_path,'a')
+    print(f"clean accuracy:  {clean_acc} %", file=f)
+    print("robust accuracy for perturbations with", file=f)
+    for eps, acc in zip(epsilons, robust_acc):
+        print(f" {args.attack} norm ≤ {eps:<6}: {acc * 100} %", file=f)
+    f.close()
 
-    with torch.no_grad():
-        for i, (images, target) in enumerate(tqdm(val_loader)):
-            if args.gpu is not None:
-                images = images.cuda(args.gpu, non_blocking=True)
-            if torch.cuda.is_available():
-                target = target.cuda(args.gpu, non_blocking=True)
+def validate(fmodel, val_loader, attack, epsilons):
+    clean_acc_list = list()
+    robust_acc_list = list()
 
-            # Casts operations to mixed precision
-            with torch.cuda.amp.autocast():
-                output = model(images)
+    for i, (images, labels) in enumerate(tqdm(val_loader)):
+        images = images.cuda()
+        images = ep.PyTorchTensor(images)
+        labels = labels.cuda()
+        labels = ep.PyTorchTensor(labels)
 
-            # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0], images.size(0))
-            top5.update(acc5[0], images.size(0))
+        # accuracy(fmodel, images, labels)
 
-    return top1.avg, top5.avg
+        clean_acc = accuracy(fmodel, images, labels)
+        clean_acc_list.append(clean_acc * 100)
+        print(clean_acc * 100)
 
-class Summary(Enum):
-    NONE = 0
-    AVERAGE = 1
-    SUM = 2
-    COUNT = 3
+        raw_advs, clipped_advs, success = attack(fmodel, images, labels, epsilons=epsilons)
+        robust_accuracy = 1 - success.float32().mean(axis=-1)
+        robust_acc_list.append(robust_accuracy.raw)
 
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f', summary_type=Summary.AVERAGE):
-        self.name = name
-        self.fmt = fmt
-        self.summary_type = summary_type
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-        return fmtstr.format(**self.__dict__)
-    
-    def summary(self):
-        fmtstr = ''
-        if self.summary_type is Summary.NONE:
-            fmtstr = ''
-        elif self.summary_type is Summary.AVERAGE:
-            fmtstr = '{name} {avg:.3f}'
-        elif self.summary_type is Summary.SUM:
-            fmtstr = '{name} {sum:.3f}'
-        elif self.summary_type is Summary.COUNT:
-            fmtstr = '{name} {count:.3f}'
-        else:
-            raise ValueError('invalid summary type %r' % self.summary_type)
-        
-        return fmtstr.format(**self.__dict__)
-
-
-class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
-
-    def display(self, batch):
-        entries = [self.prefix + self.batch_fmtstr.format(batch)]
-        entries += [str(meter) for meter in self.meters]
-        print('\t'.join(entries))
-        
-    def display_summary(self):
-        entries = [" *"]
-        entries += [meter.summary() for meter in self.meters]
-        print(' '.join(entries))
-
-    def _get_batch_fmtstr(self, num_batches):
-        num_digits = len(str(num_batches // 1))
-        fmt = '{:' + str(num_digits) + 'd}'
-        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
+    return np.mean(clean_acc_list), torch.stack(robust_acc_list).mean(dim=0).tolist()
 
 if __name__ == "__main__":
     main()

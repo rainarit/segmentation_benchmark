@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1
 
-python3 foolbox_attack.py --arch vgg9_dalernn_mini \
+python3 foolbox_attack.py --arch vgg9_divnorm_mini \
                            --data /mnt/cube/projects/imagenet_100/val/ \
                            --attack LinfFastGradientAttack \
-                           --output /home/AD/rraina/segmentation_benchmark/semseg/outputs/vgg9_dalernn_mini_foolbox_imagenet_100 \
-                           --checkpoint /home/vveeraba/src/segmentation_benchmark/semseg/checkpoints_imagenet_100/uszrla/checkpoint_best_vgg9_dalernn_mini.pth \
+                           --output /home/AD/rraina/segmentation_benchmark/semseg/outputs/vgg9_divnorm_mini_foolbox_imagenet_100 \
+                           --checkpoint /home/vveeraba/src/segmentation_benchmark/semseg/checkpoints_imagenet_100/zgkbjl/checkpoint_best_vgg9_divnorm_mini.pth \
                            --dist-url 'tcp://127.0.0.1:8008' --dist-backend 'nccl' --multiprocessing-distributed --world-size 1 --rank 0 \
 
 # for i in $(seq 1 1 5); do \
