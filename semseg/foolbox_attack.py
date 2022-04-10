@@ -194,8 +194,8 @@ def main_worker(gpu, ngpus_per_node, args):
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(args.data, transforms.Compose([
             transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),])), batch_size=16, shuffle=False)
+            transforms.CenterCrop(160),
+            transforms.ToTensor(),])), batch_size=1, shuffle=False)
 
     fmodel = PyTorchModel(model, bounds=(0, 1), preprocessing=preprocessing, device="cuda")
 

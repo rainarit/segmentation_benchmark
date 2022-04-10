@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0
 
 python3 foolbox_attack.py --arch vgg9_dalernn_mini \
                            --data /mnt/cube/projects/imagenet_100/val/ \
