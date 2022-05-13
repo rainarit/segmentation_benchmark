@@ -24,12 +24,40 @@ class SegmentationPresetTrain:
 
 
 class SegmentationPresetEval:
-    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, sigma=1):
+        self.contrast_initial = contrast
+        self.contrast_final = contrast
+        if (contrast == 1):
+            self.contrast_final = contrast
+        else:
+            self.contrast_final = self.contrast_initial-1
+
+        self.brightness_initial = brightness
+        self.brightness_final = brightness
+        if (brightness == 1):
+            self.brightness_final = brightness
+        else:
+            self.brightness_final = self.brightness_initial-1
+
+        self.sigma_initial = sigma
+        self.sigma_final = sigma
+        if (sigma == 1):
+            self.sigma_final = sigma
+        else:
+            self.sigma_final = self.sigma_initial-1
+
+        print("Contrast: ({}, {})".format(self.contrast_final, self.contrast_initial))
+        print("Brightness: ({}, {})".format(self.brightness_final, self.brightness_initial))
+        print("Sigma: ({}, {})".format(self.sigma_final, self.sigma_initial))
+
+
         self.transforms = T.Compose(
             [
                 T.RandomResize(base_size, base_size),
                 T.PILToTensor(),
                 T.ConvertImageDtype(torch.float),
+                T.ColorJitter(contrast=(self.contrast_final,self.contrast_initial), brightness=(self.brightness_final, self.brightness_initial)),
+                #T.GaussianBlur(kernel_size=19, sigma=(self.sigma_final, self.sigma_initial)),
                 T.Normalize(mean=mean, std=std),
             ]
         )

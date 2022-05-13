@@ -196,7 +196,7 @@ class ResNet_DivNorm(nn.Module):
                 self.div = DivNormEI(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
             else:
                 print("-- EIDivNorm")
-                self.div = EIDivNorm(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, groups=1)
+                self.div = EIDivNorm(64, 7, 5, 'zeros', self.divnorm_fsize, groups=1)
         else:
             print("-- DivNorm")
             self.div = DivNorm(64, divnorm_fsize=self.divnorm_fsize, groups=1)
@@ -287,8 +287,8 @@ class ResNet_DivNorm(nn.Module):
         
         return_dict['out'] = x
 
-        #return return_dict
-        return x
+        return return_dict
+        #return x
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)

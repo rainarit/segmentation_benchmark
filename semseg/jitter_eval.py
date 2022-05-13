@@ -52,7 +52,7 @@ def get_dataset(dir_path, name, image_set, transform):
 def get_transform(train):
     base_size = 520
     crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, brightness=args.brightness, hue=args.hue, sigma=args.sigma, kernel_size=args.kernel_size)
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, brightness=args.brightness, sigma=args.sigma)
 
 def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
     model.eval()
@@ -75,12 +75,12 @@ def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
 
     with torch.no_grad():
         start_time = time.time()
-        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 800, header)):
+        for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 10, header)):
             image, target = image.to(device), target.to(device)
             
             inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-            if idx<10:
-                save_image(inv_normalize(image[0], target)[0], "img{}.png".format(idx))
+            #if idx<10:
+            #    save_image(inv_normalize(image[0], target)[0], "img{}.png".format(idx))
 
             confmat_image = utils.ConfusionMatrix(num_classes)
 
@@ -117,7 +117,7 @@ def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
             wr.writerow(per_mean_iou)
     with open(mean_iou_file, 'w', newline='') as f:
             wr = csv.writer(f, quoting=csv.QUOTE_ALL)
-            wr.writerow([confmat.get_IoU()])
+            wr.writerow([confmat.get_mean_iou()])
     return confmat
 
 def Model(arch_type, backbone, num_classes, divnorm_fsize, checkpoint, distributed, gpu, device, pretrained=False, progress=True, aux_loss=True):
@@ -201,7 +201,7 @@ def main(args):
                       pretrained=False, 
                       progress=True, 
                       aux_loss=True)
-        output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/output/', args.output[idx])
+        output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/outputs/', args.output[idx])
         print(output_dir)
         output_val_test_dir = os.path.join(output_dir, "val_test_only/")
         if not(os.path.isdir(output_dir)):
@@ -245,10 +245,8 @@ def get_args_parser(add_help=True):
         action="store_true",
     )
     # distributed training parameters
-    parser.add_argument('--world-size', default=1, type=int,
-                        help='number of distributed processes')
-    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
-
+    parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
+    parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
     return parser
 
 if __name__ == "__main__":

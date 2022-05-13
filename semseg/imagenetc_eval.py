@@ -175,15 +175,21 @@ def main_worker(gpu, ngpus_per_node, args):
         if 'module' not in value:
             name = 'module.' + value
             checkpoint['model'][name] = checkpoint_old['model'][value]
-    import ipdb; ipdb.set_trace()
+        else:
+            checkpoint['model'][value] = checkpoint_old['model'][value]
     model.load_state_dict(checkpoint['model'], strict=True)
     print("=> loaded checkpoint '{}' (epoch {})".format(args.checkpoint, checkpoint_old['epoch']))
     model.eval()
 
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
     val_dataset = datasets.ImageFolder(args.data, transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(160),
-            transforms.ToTensor(),]))
+            transforms.ToTensor(),
+            normalize,
+        ]))
 
     val_dataset_100_class_to_idx = {'n01558993': 0, 'n01692333': 1, 'n01729322': 2, 'n01735189': 3, 'n01749939': 4, 
                                     'n01773797': 5, 'n01820546': 6, 'n01855672': 7, 'n01978455': 8, 'n01980166': 9, 
@@ -215,7 +221,7 @@ def main_worker(gpu, ngpus_per_node, args):
             if os.path.isfile(f):
                 val_dataset.samples.append((str(f), index))
     
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, num_workers= args.workers, shuffle=False, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=32, num_workers= args.workers, shuffle=False, pin_memory=True)
 
     top1_avg, top5_avg = validate(val_loader, model, args)
     with open(acc_path, "w") as file:

@@ -233,7 +233,6 @@ def main(args):
 
     eval_mean_iou_path = os.path.join(args.output_dir, "eval_mean_iou.csv") # epoch eval mean IoU 
 
-
     with open(eval_mean_iou_path, 'w') as f:
         writer = csv.writer(f)
         for epoch in range(args.start_epoch, args.epochs):
@@ -241,8 +240,6 @@ def main(args):
                 train_sampler.set_epoch(epoch)
             train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, scaler)
             confmat, class_iou_image, img_list, target_list, prediction_list = evaluate(model, data_loader_test, device=device, num_classes=num_classes)
-            print(confmat)
-            print(class_iou_image)
 
             mean_iou = confmat.get_mean_iou()
             writer.writerow([mean_iou])
@@ -263,10 +260,10 @@ def main(args):
                 writer_per_image = csv.writer(f)
                 writer_per_image.writerow(class_iou_image)
 
-            for i, (img, target, prediction) in enumerate(zip(img_list, target_list, prediction_list)):
-                utils.save_np_image(os.path.join(args.output_epoch_image_dir, f"{i}.npy"), img)
-                utils.save_np_image(os.path.join(args.output_epoch_target_dir, f"{i}.npy"), target)
-                utils.save_np_image(os.path.join(args.output_epoch_prediction_dir, f"{i}.npy"), prediction)
+            #for i, (img, target, prediction) in enumerate(zip(img_list, target_list, prediction_list)):
+            #    utils.save_np_image(os.path.join(args.output_epoch_image_dir, f"{i}.npy"), img)
+            #    utils.save_np_image(os.path.join(args.output_epoch_target_dir, f"{i}.npy"), target)
+            #    utils.save_np_image(os.path.join(args.output_epoch_prediction_dir, f"{i}.npy"), prediction)
 
             checkpoint = {
                 "model": model_without_ddp.state_dict(),

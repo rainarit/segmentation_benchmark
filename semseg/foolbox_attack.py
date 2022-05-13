@@ -189,30 +189,27 @@ def main_worker(gpu, ngpus_per_node, args):
     print("=> loaded checkpoint '{}' (epoch {})".format(args.checkpoint, checkpoint_old['epoch']))
     model.eval()
 
-    preprocessing = dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], axis=-3)
+    #preprocessing = dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], axis=-3)
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     
     val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(args.data, transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(160),
-            transforms.ToTensor(),])), batch_size=1, shuffle=False)
+            transforms.ToTensor(), normalize])), batch_size=64, shuffle=False)
 
-    fmodel = PyTorchModel(model, bounds=(0, 1), preprocessing=preprocessing, device="cuda")
+    fmodel = PyTorchModel(model, bounds=(0, 1), device="cuda")
 
     # apply the attack
     attack = globals()[attack]()
     epsilons = [
-        0.0000,
-        0.0002,
-        0.0004,
-        0.0006,
-        0.0008,
-        0.0010,
-        0.0012,
-        0.0014,
-        0.0016,
-        0.0018,
-        0.0020,
+        0,
+        4./255,
+        8./255,
+        16./255,
+        32./255,
+        64./255,
     ]
 
     clean_acc, robust_acc = validate(fmodel=fmodel, val_loader=val_loader, attack=attack, epsilons=epsilons)
@@ -221,7 +218,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print(f"clean accuracy:  {clean_acc} %", file=f)
     print("robust accuracy for perturbations with", file=f)
     for eps, acc in zip(epsilons, robust_acc):
-        print(f" {args.attack} norm ≤ {eps:<6}: {acc * 100} %", file=f)
+        print(f" {args.attack} norm ≤ {eps:<6}: {acc*100} %", file=f)
     f.close()
 
 def validate(fmodel, val_loader, attack, epsilons):
@@ -234,11 +231,8 @@ def validate(fmodel, val_loader, attack, epsilons):
         labels = labels.cuda()
         labels = ep.PyTorchTensor(labels)
 
-        accuracy(fmodel, images, labels)
-
         clean_acc = accuracy(fmodel, images, labels)
         clean_acc_list.append(clean_acc * 100)
-        print(clean_acc * 100)
 
         raw_advs, clipped_advs, success = attack(fmodel, images, labels, epsilons=epsilons)
         robust_accuracy = 1 - success.float32().mean(axis=-1)

@@ -37,10 +37,10 @@ class ExcInhDivNorm(nn.Module):
 
     def __init__(self,
                  in_channels,
-                 divnorm_fsize=5,
                  exc_fsize=7,
                  inh_fsize=5,
                  padding_mode='zeros',
+                 divnorm_fsize=5,
                  groups=1,
                  device='cuda',
                  ):
