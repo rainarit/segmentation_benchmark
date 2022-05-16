@@ -23,7 +23,7 @@ for j in $(seq 2 1 5); do
             --brightness $contrast1 \
             --model deeplabv3 \
             --backbone "resnet50_divnorm" \
-            --output "resnet50_divnorm_after_conv1_groups1_brightness_${j}(${contrast2},${contrast1})" \
+            --output "resnet50_divnorm_after_conv1_groups1_sigma_${j}(${contrast2},${contrast1})" \
             --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset  \
             --checkpoint "/home/AD/rraina/segmentation_benchmark/semseg/output/resnet50_divnorm_after_conv1_groups1/checkpoints/checkpoint_49.pth"
 

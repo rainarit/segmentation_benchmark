@@ -52,7 +52,10 @@ def get_dataset(dir_path, name, image_set, transform):
 def get_transform(train):
     base_size = 520
     crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, brightness=args.brightness, sigma=args.sigma)
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, 
+                                                                                                              brightness=args.brightness, sigma=args.sigma, 
+                                                                                                              occlusion=args.occlude, jitter=False, blur=False, 
+                                                                                                              occlude=True)
 
 def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
     model.eval()
@@ -78,24 +81,24 @@ def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
         for idx, (image, target) in enumerate(metric_logger.log_every(data_loader, 10, header)):
             image, target = image.to(device), target.to(device)
             
-            inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-            #if idx<10:
-            #    save_image(inv_normalize(image[0], target)[0], "img{}.png".format(idx))
-
             confmat_image = utils.ConfusionMatrix(num_classes)
 
             output = model(image)
             output = output['out']
 
             if save:
-                
                 image_path =  os.path.join(image_dir, '{}.npy'.format(idx))
                 target_path = os.path.join(target_dir, '{}.npy'.format(idx))
                 prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
 
-                utils.save_on_master(inv_normalize(image[0], target)[0], image_path)
-                utils.save_on_master(target, target_path)
-                utils.save_on_master(output, prediction_path)
+                inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
+                img_npy = inv_normalize(image[0], target)[0].cpu().detach().numpy()
+                target_npy = target.cpu().detach().numpy()
+                prediction_npy = output.cpu().detach().numpy()
+
+                utils.save_np_image(image_path, img_npy)
+                utils.save_np_image(target_path, target_npy)
+                utils.save_np_image(prediction_path, prediction_npy)
 
             confmat.update(target.flatten(), output.argmax(1).flatten())
 
@@ -148,12 +151,15 @@ def Model(arch_type, backbone, num_classes, divnorm_fsize, checkpoint, distribut
     if aux_loss:
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
+    
+    checkpoint = torch.load(str(checkpoint), map_location='cuda:0')
+    model_without_ddp.load_state_dict(checkpoint['model'])
 
-    try:
-        checkpoint = torch.load(str(checkpoint))
-        model_without_ddp.load_state_dict(checkpoint['model'])
-    except:
-        sys.exit('Error with checkpoint weights file.')
+    #try:
+    #    checkpoint = torch.load(str(checkpoint))
+    #    model_without_ddp.load_state_dict(checkpoint['model'])
+    #except:
+    #    sys.exit('Error with checkpoint weights file.')
 
     print("=> Created model")
     print("==> Arch Type: " + arch_type)
@@ -210,7 +216,7 @@ def main(args):
             utils.mkdir(output_val_test_dir)
         mean_iou_file = os.path.join(output_val_test_dir, "mean_iou.csv")  
 
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=output_val_test_dir) 
+        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=output_val_test_dir, save=True) 
 
         print(confmat)
 
@@ -235,6 +241,7 @@ def get_args_parser(add_help=True):
     parser.add_argument('--hue', default=1.0, type=float)
     parser.add_argument('--kernel_size', default=1, type=int)
     parser.add_argument('--sigma', default=1.0, type=float)
+    parser.add_argument('-ol', '--occlude', default=0., type=float, help='range for occlusion perturbation')
     parser.add_argument('--print-freq', default=800, type=int, help='print frequency')
     parser.add_argument('--output', default=['deeplabv3resnet50'], help='path where to save', nargs='+')
     parser.add_argument('--checkpoint', default=['deeplabv3resnet50'], help='resume from checkpoint', nargs='+')

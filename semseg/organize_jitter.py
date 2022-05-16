@@ -29,7 +29,7 @@ def main():
         for model in model_names:
             acc_list = []
             final_file = os.path.join(output_folder, model + '_' + pertubation + '.csv')
-            for a in range(1, 20, 1):
+            for a in range(1, 21, 1):
                 if a == 1:
                     b = a 
                 else:

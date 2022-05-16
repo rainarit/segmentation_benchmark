@@ -24,7 +24,7 @@ class SegmentationPresetTrain:
 
 
 class SegmentationPresetEval:
-    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, sigma=1):
+    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, sigma=1, occlusion=0, jitter=False, blur=False, occlude=False):
         self.contrast_initial = contrast
         self.contrast_final = contrast
         if (contrast == 1):
@@ -46,21 +46,29 @@ class SegmentationPresetEval:
         else:
             self.sigma_final = self.sigma_initial-1
 
-        print("Contrast: ({}, {})".format(self.contrast_final, self.contrast_initial))
-        print("Brightness: ({}, {})".format(self.brightness_final, self.brightness_initial))
-        print("Sigma: ({}, {})".format(self.sigma_final, self.sigma_initial))
+        self.occlusion_initial = occlusion
+        self.occlusion_final = occlusion
+        if (occlusion == 0):
+            self.occlusion_final = occlusion
+        else:
+            self.occlusion_final = self.occlusion_initial-0.1
 
-
-        self.transforms = T.Compose(
-            [
-                T.RandomResize(base_size, base_size),
-                T.PILToTensor(),
-                T.ConvertImageDtype(torch.float),
-                T.ColorJitter(contrast=(self.contrast_final,self.contrast_initial), brightness=(self.brightness_final, self.brightness_initial)),
-                #T.GaussianBlur(kernel_size=19, sigma=(self.sigma_final, self.sigma_initial)),
-                T.Normalize(mean=mean, std=std),
-            ]
-        )
+        transformations = [T.RandomResize(base_size, base_size), T.ToTensor()]
+        if jitter:
+            print('Using ColorJitter')
+            print("Contrast: ({}, {})".format(self.contrast_final, self.contrast_initial))
+            print("Brightness: ({}, {})".format(self.brightness_final, self.brightness_initial))
+            transformations.append(T.ColorJitter(contrast=(self.contrast_final,self.contrast_initial), brightness=(self.brightness_final, self.brightness_initial)))
+        if blur:
+            print('Using Gaussian Blur')
+            print("Sigma: ({}, {})".format(self.sigma_final, self.sigma_initial))
+            transformations.append(T.GaussianBlur(kernel_size=19, sigma=(self.sigma_final, self.sigma_initial)))
+        if occlude:
+            print('Using Occlusion')
+            print("Occlusion: ({}, {})".format(self.occlusion_final, self.occlusion_initial))
+            transformations.append(T.Occlude(self.occlusion_final, self.occlusion_initial, 0.),)
+        transformations.append(T.Normalize(mean=mean, std=std))
+        self.transforms = T.Compose(transformations)
 
     def __call__(self, img, target):
         return self.transforms(img, target)

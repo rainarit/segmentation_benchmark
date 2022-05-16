@@ -310,8 +310,6 @@ def _resnet(
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
         model.load_state_dict(state_dict, strict=False)
-        #checkpoint = torch.load(model_urls[arch])
-        #model.load_state_dict(checkpoint['state_dict'], strict=False)
     return model
 
 

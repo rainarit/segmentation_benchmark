@@ -2,6 +2,7 @@ import random
 import numbers
 from typing import Tuple, List, Optional
 from collections.abc import Sequence
+from PIL import Image
 
 import numpy as np
 import torch
@@ -88,13 +89,11 @@ class CenterCrop:
         target = F.center_crop(target, self.size)
         return image, target
 
-
-class PILToTensor:
+class ToTensor(object):
     def __call__(self, image, target):
-        image = F.pil_to_tensor(image)
+        image = F.to_tensor(image)
         target = torch.as_tensor(np.array(target), dtype=torch.int64)
         return image, target
-
 
 class ConvertImageDtype:
     def __init__(self, dtype):
@@ -293,3 +292,38 @@ class GaussianBlur:
     def __repr__(self) -> str:
         s = f"{self.__class__.__name__}(kernel_size={self.kernel_size}, sigma={self.sigma})"
         return s
+
+class Occlude:
+  """
+  Apply occlusion to a patch of pixels in images.
+  Due to center-bias present in natural images from ImageNet, a 2-D Gaussian is 
+  used to sample the location of the patch.
+  """
+  def __init__(self, scale_low, scale_high, value):
+    super().__init__()
+    self.scale = (scale_low, scale_high)
+    self.value = value
+
+  @staticmethod
+  def get_params(img, scale, value=0.):
+    img_h, img_w = img.shape[1], img.shape[2]
+    image_area = img_h * img_w
+    erase_area = image_area * torch.empty(1).uniform_(scale[0], scale[1]).item()
+    print(erase_area)
+    for i in range(10):
+      erase_h = int(np.sqrt(erase_area))
+      erase_w = int(np.sqrt(erase_area))
+      if not (erase_h < img_h and erase_w < img_w):
+        continue
+      
+      i = np.random.randint(0, img_h - erase_h + 1)
+      j = np.random.randint(0, img_w - erase_w + 1)
+      return i, j, erase_h, erase_w, value
+    return 0, 0, 
+    
+  def __call__(self, img, target) -> Tensor:
+    if isinstance(img, Image.Image):
+      img = F.to_tensor(img)
+    i, j, erase_h, erase_w, value = self.get_params(img=img, scale=self.scale, value=self.value)
+    img = F.erase(img, i, j, erase_h, erase_w, value, True)
+    return img, target
