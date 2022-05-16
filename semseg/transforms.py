@@ -3,6 +3,7 @@ import numbers
 from typing import Tuple, List, Optional
 from collections.abc import Sequence
 from PIL import Image
+import warnings
 
 import numpy as np
 import torch
@@ -41,6 +42,39 @@ class Compose:
             image, target = t(image, target)
         return image, target
 
+class Resize:
+    def __init__(self, size, interpolation=T.InterpolationMode.BILINEAR, max_size=None, antialias=None):
+        super().__init__()
+        if not isinstance(size, (int, Sequence)):
+            raise TypeError(f"Size should be int or sequence. Got {type(size)}")
+        if isinstance(size, Sequence) and len(size) not in (1, 2):
+            raise ValueError("If size is a sequence, it should have 1 or 2 values")
+        self.size = size
+        self.max_size = max_size
+
+        # Backward compatibility with integer value
+        if isinstance(interpolation, int):
+            warnings.warn(
+                "Argument interpolation should be of type InterpolationMode instead of int. "
+                "Please, use InterpolationMode enum."
+            )
+            interpolation = F._interpolation_modes_from_int(interpolation)
+
+        self.interpolation = interpolation
+        self.antialias = antialias
+
+    def __call__(self, img, target):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be scaled.
+        Returns:
+            PIL Image or Tensor: Rescaled image.
+        """
+        return F.resize(img, self.size, self.interpolation, self.max_size, self.antialias), target
+
+    def __repr__(self) -> str:
+        detail = f"(size={self.size}, interpolation={self.interpolation.value}, max_size={self.max_size}, antialias={self.antialias})"
+        return f"{self.__class__.__name__}{detail}"
 
 class RandomResize:
     def __init__(self, min_size, max_size=None):
@@ -228,6 +262,8 @@ class ColorJitter:
         )
         return s
 
+
+
 class GaussianBlur:
     """Blurs image with randomly chosen Gaussian blur.
     If the image is torch Tensor, it is expected
@@ -309,7 +345,6 @@ class Occlude:
     img_h, img_w = img.shape[1], img.shape[2]
     image_area = img_h * img_w
     erase_area = image_area * torch.empty(1).uniform_(scale[0], scale[1]).item()
-    print(erase_area)
     for i in range(10):
       erase_h = int(np.sqrt(erase_area))
       erase_w = int(np.sqrt(erase_area))

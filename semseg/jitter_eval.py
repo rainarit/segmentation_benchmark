@@ -52,7 +52,7 @@ def get_dataset(dir_path, name, image_set, transform):
 def get_transform(train):
     base_size = 520
     crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, contrast=args.contrast, 
+    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, crop_size, contrast=args.contrast, 
                                                                                                               brightness=args.brightness, sigma=args.sigma, 
                                                                                                               occlusion=args.occlude, jitter=False, blur=False, 
                                                                                                               occlude=True)

@@ -24,7 +24,7 @@ class SegmentationPresetTrain:
 
 
 class SegmentationPresetEval:
-    def __init__(self, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, sigma=1, occlusion=0, jitter=False, blur=False, occlude=False):
+    def __init__(self, base_size, crop_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), contrast=1, brightness=1, sigma=1, occlusion=0, jitter=False, blur=False, occlude=False):
         self.contrast_initial = contrast
         self.contrast_final = contrast
         if (contrast == 1):
@@ -53,7 +53,7 @@ class SegmentationPresetEval:
         else:
             self.occlusion_final = self.occlusion_initial-0.1
 
-        transformations = [T.RandomResize(base_size, base_size), T.ToTensor()]
+        transformations = [T.Resize(base_size), T.CenterCrop(crop_size), T.ToTensor()]
         if jitter:
             print('Using ColorJitter')
             print("Contrast: ({}, {})".format(self.contrast_final, self.contrast_initial))

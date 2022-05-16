@@ -1,7 +1,7 @@
 #!/bin/bash
 export CUDA_VISIBLE_DEVICES=2
 
-for i in $(seq 0.2 0.1 1); do \
+for i in $(seq 0.0 0.1 1); do \
     high=$i
     high=${high/#-./-0.}
     high=${high/#./0.}
@@ -22,8 +22,8 @@ for i in $(seq 0.2 0.1 1); do \
             --dataset voc_aug --aux-loss\
             -ol $high \
             --model deeplabv3 \
-            --backbone resnet50_eidivnorm \
-            --output "deeplabv3_eidivnorm_resnet50_occlusion_(${low},${high})" \
+            --backbone resnet50 \
+            --output "deeplabv3_resnet50_occlusion_(${low},${high})" \
             --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset  \
-            --checkpoint "/home/AD/rraina/segmentation_benchmark/semseg/outputs/deeplabv3_eidivnorm_resnet50/epoch_47/model_47.pth"
+            --checkpoint "/home/AD/rraina/segmentation_benchmark/semseg/outputs/deeplabv3_resnet50/epoch_46/model_46.pth"
 done
