@@ -4,6 +4,7 @@ import time
 import torch
 import torch.utils.data
 import transforms as T
+#import torchvision.transforms as  T
 from torch import nn
 import torchvision
 import numpy as np
@@ -16,12 +17,15 @@ from coco_utils import get_coco
 import presets
 import utils
 from torchvision import utils as torch_utils
+from torchvision.transforms import functional as F
 import os
 import sys
 import torch
 import torch.distributed as dist
 import matplotlib.pyplot as plt
 import math
+from pathlib import Path
+import string
 
 from torchvision.utils import save_image
 import torch
@@ -31,6 +35,10 @@ from models.segmentation.segmentation import _load_model as load_model
 import  csv
 from torchvision.utils import save_image
 
+def generate_rand_string(n):
+  letters = string.ascii_lowercase
+  str_rand = ''.join(random.choice(letters) for i in range(n))
+  return str_rand
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
@@ -52,10 +60,14 @@ def get_dataset(dir_path, name, image_set, transform):
 def get_transform(train):
     base_size = 520
     crop_size = 480
+    occlude = True
+    if args.occlude_low == 0 and args.occlude_high == 0:
+        occlude = False
+        print('Not using occlusion, occlude=', occlude)
     return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size, crop_size, contrast=args.contrast, 
                                                                                                               brightness=args.brightness, sigma=args.sigma, 
-                                                                                                              occlusion=args.occlude, jitter=False, blur=False, 
-                                                                                                              occlude=True)
+                                                                                                              occlude_low=args.occlude_low, occlude_high=args.occlude_high, 
+                                                                                                              jitter=False, blur=False, occlude=occlude)
 
 def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
     model.eval()
@@ -92,7 +104,7 @@ def evaluate(model, data_loader, device, num_classes, output_dir, save=False):
                 prediction_path = os.path.join(prediction_dir, '{}.npy'.format(idx))
 
                 inv_normalize = T.Normalize(mean=(-0.485, -0.456, -0.406), std=(1/0.229, 1/0.224, 1/0.225))
-                img_npy = inv_normalize(image[0], target)[0].cpu().detach().numpy()
+                img_npy = image.cpu().detach().numpy()
                 target_npy = target.cpu().detach().numpy()
                 prediction_npy = output.cpu().detach().numpy()
 
@@ -168,7 +180,7 @@ def Model(arch_type, backbone, num_classes, divnorm_fsize, checkpoint, distribut
     return model_without_ddp
 
 def main(args):
-
+    args.seed = 426
     seed=args.seed
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -188,12 +200,15 @@ def main(args):
 
     device = torch.device(args.device)
 
-    dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+    results_root = '/home/AD/rraina/segmentation_benchmark/semseg/outputs/'
 
-    data_loader_test = torch.utils.data.DataLoader(dataset_test, 
-        batch_size=1, 
-        num_workers=args.workers, 
-        collate_fn=utils.collate_fn)
+    num_classes = 21
+
+    while True:
+            output_root = Path("%s/%s" % (results_root, generate_rand_string(6)))
+            if not os.path.exists(output_root):
+                #args.output = output_dir
+                break
     
     for idx, backbone in enumerate(args.backbone):
         model = Model(arch_type=args.model,
@@ -207,18 +222,35 @@ def main(args):
                       pretrained=False, 
                       progress=True, 
                       aux_loss=True)
-        output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/outputs/', args.output[idx])
-        print(output_dir)
-        output_val_test_dir = os.path.join(output_dir, "val_test_only/")
-        if not(os.path.isdir(output_dir)):
-            utils.mkdir(output_dir)
-        if not(os.path.isdir(output_val_test_dir)):
-            utils.mkdir(output_val_test_dir)
-        mean_iou_file = os.path.join(output_val_test_dir, "mean_iou.csv")  
+        for o_l in np.arange(0.0, 1.0, 0.1):
+            if o_l == 0.0:
+                args.occlude_low = 0.0
+                args.occlude_high = 0.0
+            else:
+                args.occlude_low, args.occlude_high = o_l, o_l+0.1
+            dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+            print('Evaluating occlude_low = %s, occlude_high = %s' % (args.occlude_low, args.occlude_high))
+            data_loader_test = torch.utils.data.DataLoader(dataset_test, 
+                                                            batch_size=32, 
+                                                            num_workers=args.workers, 
+                                                            collate_fn=utils.collate_fn)
 
-        confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=output_val_test_dir, save=True) 
+            output_subdir = "output_%s_imagenet100_occlude_%s_%s" % (backbone, args.occlude_low, args.occlude_high)
+            output_dir = output_root / output_subdir
+            output_dir.mkdir(exist_ok=True, parents=True)
+            #output_dir = os.path.join('/home/AD/rraina/segmentation_benchmark/semseg/outputs/', args.output[idx])
+            #output_dir = os.path.join(output_dir, str(args.seed))
+            print(output_dir)
+            output_val_test_dir = os.path.join(output_dir, "val_test_only/")
+            if not(os.path.isdir(output_dir)):
+                utils.mkdir(output_dir)
+            if not(os.path.isdir(output_val_test_dir)):
+                utils.mkdir(output_val_test_dir)
+            mean_iou_file = os.path.join(output_val_test_dir, "mean_iou.csv")  
 
-        print(confmat)
+            confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, output_dir=output_val_test_dir, save=True) 
+
+            print(confmat)
 
     return
 
@@ -241,7 +273,8 @@ def get_args_parser(add_help=True):
     parser.add_argument('--hue', default=1.0, type=float)
     parser.add_argument('--kernel_size', default=1, type=int)
     parser.add_argument('--sigma', default=1.0, type=float)
-    parser.add_argument('-ol', '--occlude', default=0., type=float, help='range for occlusion perturbation')
+    #parser.add_argument('-ol-low', '--occlude-low', default=0., type=float, help='range for occlusion perturbation')
+    #parser.add_argument('-ol-high', '--occlude-high', default=0., type=float, help='range for occlusion perturbation')
     parser.add_argument('--print-freq', default=800, type=int, help='print frequency')
     parser.add_argument('--output', default=['deeplabv3resnet50'], help='path where to save', nargs='+')
     parser.add_argument('--checkpoint', default=['deeplabv3resnet50'], help='resume from checkpoint', nargs='+')
@@ -255,6 +288,39 @@ def get_args_parser(add_help=True):
     parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
     parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
     return parser
+
+class Occlude(nn.Module):
+  """
+  Apply occlusion to a patch of pixels in images.
+  Due to center-bias present in natural images from ImageNet, a 2-D Gaussian is 
+  used to sample the location of the patch.
+  """
+  def __init__(self, scale_low, scale_high, value):
+    super().__init__()
+    self.scale = (scale_low, scale_high)
+    self.value = value
+
+  @staticmethod
+  def get_params(img, scale, value=0.):
+    img_h, img_w = img.shape[1], img.shape[2]
+    image_area = img_h * img_w
+    erase_area = image_area * torch.empty(1).uniform_(scale[0], scale[1]).item()
+    for i in range(10):
+      erase_h = int(np.sqrt(erase_area))
+      erase_w = int(np.sqrt(erase_area))
+      if not (erase_h < img_h and erase_w < img_w):
+        continue
+      
+      i = np.random.randint(0, img_h - erase_h + 1)
+      j = np.random.randint(0, img_w - erase_w + 1)
+      return i, j, erase_h, erase_w, value
+    return 0, 0, 
+    
+  def forward(self, img):
+    if isinstance(img, Image.Image):
+      img = F.to_tensor(img)
+    i, j, erase_h, erase_w, value = self.get_params(img=img, scale=self.scale, value=self.value)
+    return F.erase(img, i, j, erase_h, erase_w, value, True)
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()

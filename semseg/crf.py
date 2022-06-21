@@ -23,6 +23,7 @@ import pydensecrf.utils as utils_crf
 from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
+import ipdb
 
 seed=42
 random.seed(seed)
@@ -35,6 +36,11 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 g = torch.Generator()
 g.manual_seed(42)
+
+try:
+    from torchvision import prototype
+except ImportError:
+    prototype = None
 
 class DenseCRF(object):
     def __init__(self, iter_max, pos_w, pos_xy_std, bi_w, bi_xy_std, bi_rgb_std):
@@ -67,22 +73,23 @@ class DenseCRF(object):
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
-        return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
+        return torchvision.datasets.SBDataset(*args, mode="segmentation", **kwargs)
+
     paths = {
-        "coco": (dir_path, get_coco, 21), 
         "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
+        "voc_aug": (dir_path, sbd, 21),
+        "coco": (dir_path, get_coco, 21),
     }
     p, ds_fn, num_classes = paths[name]
-    if name == "voc":
-        ds = ds_fn(p, year="2012", image_set=image_set, transforms=transform, download=False)
-    else:
-        ds = ds_fn(p, image_set=image_set, transforms=transform)
+
+    ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
 
 def get_transform(train):
-    base_size = 520
-    crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
+    if train:
+        return presets.SegmentationPresetTrain(base_size=520, crop_size=480)
+    else:
+        return presets.SegmentationPresetEval(base_size=520)
 
 def main(args):
 
@@ -105,26 +112,40 @@ def main(args):
         bi_w=4,
     )
 
-    folder_name = str(args.model) + str(args.backbone)
+    #folder_name = str(args.model) + str(args.backbone)
 
     # Path to prediction images
-    prediction_dir = os.path.join(
+    # prediction_dir = os.path.join(
+    #     args.output_dir,
+    #     "features",
+    #     "voc12",
+    #     folder_name.lower(),
+    #     "val",
+    #     "prediction",
+    # )
+
+    # Path to images
+    image_dir = os.path.join(
         args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "prediction",
+        "epoch_49",
+        "images",
+        "image"
+    )
+
+    # Path to targets
+    target_dir = os.path.join(
+        args.output_dir,
+        "epoch_49",
+        "images",
+        "target"
     )
 
     # Path to logits
     logit_dir = os.path.join(
         args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "logit",
+        "epoch_49",
+        "images",
+        "prediction"
     )
     print("Logit src:", logit_dir)
     if not os.path.isdir(logit_dir):
@@ -134,11 +155,20 @@ def main(args):
     # Path to save scores
     save_dir = os.path.join(
         args.output_dir,
-        "scores",
-        "voc12",
-        folder_name.lower(),
-        "val",
+        "epoch_49",
+        "images",
+        "crf"
     )
+
+    pre_crf_save_dir = os.path.join(
+        args.output_dir,
+        "epoch_49",
+        "images",
+        "pre_crf"
+    )
+    if not os.path.isdir(save_dir):
+        os.mkdir(save_dir)
+        os.mkdir(pre_crf_save_dir)
 
     save_path = os.path.join(save_dir, "scores_crf.json")
     print("Score dst:", save_path)
@@ -149,30 +179,38 @@ def main(args):
 
     # Process per sample
     def process(i):
-        image, target = dataset_test.__getitem__(i)
+    
+        #image, target = dataset_test.__getitem__(i)
+        image_filename = os.path.join(str(image_dir), str(i) + ".npy")
+        image = torch.Tensor(np.load(image_filename))
+        
+        target_filename = os.path.join(str(target_dir), str(i) + ".npy")
+        target = torch.Tensor(np.load(target_filename))
 
         filename = os.path.join(str(logit_dir), str(i) + ".npy")
         logit = np.load(filename)[0]
 
         _, H, W = image.shape
+        
         logit = torch.FloatTensor(logit)[None, ...]
-        logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
+        #logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
         prob = F.softmax(logit, dim=1)[0].numpy()
         image = image.numpy().astype(np.uint8).transpose(1, 2, 0)
-
+        label_precrf = np.argmax(prob, axis=0)
+        np.save(os.path.join(pre_crf_save_dir, str(i) + '.npy'), label_precrf)
         prob = postprocessor(image, prob)
 
         label = np.argmax(prob, axis=0)
-
+        np.save(os.path.join(save_dir, str(i) + '.npy'), label)
         return label, target
 
     for i in tqdm(range(len(dataset_test))):
         image, target = process(i)
-        writer.add_image('Images/image', image, i, dataformats='HW')
-        writer.add_image('Images/target', target, i, dataformats='HW')
+        #writer.add_image('Images/image', image, i, dataformats='HW')
+        #writer.add_image('Images/target', target, i, dataformats='HW')
         confmat.update(target.flatten(), image.flatten())
-        writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
-        writer.flush()
+        #writer.add_scalar("Mean IoU/val", confmat.get_IoU(), i)
+        #writer.flush()
     
     confmat.reduce_from_all_processes()
 
@@ -185,7 +223,7 @@ def get_args_parser(add_help=True):
     parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
     parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
-    parser.add_argument('--dataset', default='coco', help='dataset name')
+    parser.add_argument('--dataset', default='voc', help='dataset name')
     parser.add_argument('--model', default='deeplabv3', help='model')
     parser.add_argument('--backbone', default='resnet101', help='backbone')
     parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')

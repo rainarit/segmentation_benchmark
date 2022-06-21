@@ -2,7 +2,7 @@
 
 export CUDA_VISIBLE_DEVICES=0,1
 
-# Runing segmentation
+# Running segmentation
 
 torchrun --nproc_per_node=2 train.py \
          --data-path /home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset \
@@ -15,7 +15,6 @@ torchrun --nproc_per_node=2 train.py \
          --output deeplabv3_eidivnorm_resnet50 \
          --aux-loss
 
-# Runing object detection
+# Running object detection
 
 #python3 backbone_train.py -a resnet50_divnormei --dist-url 'tcp://127.0.0.1:8008' --dist-backend 'nccl' --multiprocessing-distributed --world-size 1 --rank 0 --data "/mnt/cube/projects/imagenet_100" --output-dir 'resnet50_divnormei_imagenet_100'
-

@@ -94,9 +94,21 @@ def main():
 
     main_worker(args.gpu, args)
 
+def generate_rand_string(n):
+  letters = string.ascii_lowercase
+  str_rand = ''.join(random.choice(letters) for i in range(n))
+  return str_rand
 
 def main_worker(gpu, args):
     args.checkpoint_dir = Path('/'.join(args.resume.split('/')[:-1]))
+    while True:
+        output_dir = Path("%s/output_%s_imagenet100_occlude_%s_%s_%s" % (args.output, args.arch,
+                                                                         args.occlude_low, args.occlude_high, 
+                                                                         generate_rand_string(6)))
+        if not os.path.exists(output_dir):
+            args.output = output_dir
+            break
+    
     global best_acc1
     args.gpu = gpu
 
@@ -174,7 +186,7 @@ def main_worker(gpu, args):
     val_acc1, val_acc5 = validate(val_loader, model, criterion, args)
     # remember best acc@1 and save checkpoint
     occlude_dict = {"occlude_low": args.occlude_low, "occlude_high": args.occlude_high, "val_accuracy1": val_acc1.item(), "val_accuracy5": val_acc5.item()}
-    with open(args.output, 'w') as f:
+    with open(args.output / "results.csv", 'w') as f:
         for key in occlude_dict.keys():
             f.write("%s,%s\n"%(key,occlude_dict[key]))
     #print(json.dumps(occlude_dict), file=global_stats_file)

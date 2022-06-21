@@ -1,303 +1,184 @@
+
+   
 import datetime
 import os
 import time
-import torch
-import torch.utils.data
-from torch import nn
-import torchvision
+import warnings
+from pathlib import Path
+import string
 import numpy as np
 import random
-from PIL import Image
-from coco_utils import get_coco
+
 import presets
-import utils
-import os
-import sys
 import torch
-import json
-import matplotlib.image as mpimg
-from torchvision.utils import save_image
-from models.segmentation.segmentation import _load_model
-import ipdb
+import torch.utils.data
+import torchvision
+import utils
+from coco_utils import get_coco
+from torch import nn
+import transforms
+from torchvision.transforms import functional as F, InterpolationMode
 
-from tqdm import tqdm
+from models.segmentation.segmentation import _load_model as load_model
 
-seed=42
-random.seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
-g = torch.Generator()
-g.manual_seed(42)
-
-evaluate_step = 0
-train_step = 0
+def generate_rand_string(n):
+  letters = string.ascii_lowercase
+  str_rand = ''.join(random.choice(letters) for i in range(n))
+  return str_rand
 
 def get_dataset(dir_path, name, image_set, transform):
     def sbd(*args, **kwargs):
-        return torchvision.datasets.SBDataset(*args, mode='segmentation', **kwargs)
+        return torchvision.datasets.SBDataset(*args, mode="segmentation", **kwargs)
+
     paths = {
-        "coco": (dir_path, get_coco, 21), 
         "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
+        "voc_aug": (dir_path, sbd, 21),
+        "coco": (dir_path, get_coco, 21),
     }
     p, ds_fn, num_classes = paths[name]
-    if name == "voc":
-        ds = ds_fn(p, image_set=image_set, transforms=transform, download=False)
-    else:
-        ds = ds_fn(p, image_set=image_set, transforms=transform)
+
+    ds = ds_fn(p, image_set=image_set, transforms=transform)
     return ds, num_classes
 
-def get_transform(train):
-    base_size = 520
-    crop_size = 480
-    return presets.SegmentationPresetTrain(base_size, crop_size) if train else presets.SegmentationPresetEval(base_size)
+def get_transform():
+    return presets.SegmentationPresetEval(base_size=520)
 
-def get_mask(output):
-    output_predictions = output[0].argmax(0)
-    # create a color pallette, selecting a color for each class
-    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
-    colors = (colors % 255).numpy().astype("uint8")
-    # plot the semantic segmentation predictions of 21 classes in each color
-    r = Image.fromarray(output_predictions.byte().cpu().numpy())
-    r.putpalette(colors)
-    return np.array(r.convert('RGB'))
+def evaluate(model, data_loader, device, num_classes, root):
+    model.eval()
+    confmat = utils.ConfusionMatrix(num_classes)
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = "Test:"
+    with torch.inference_mode():
+        for index, (image, target) in enumerate(metric_logger.log_every(data_loader, 100, header)):
+            image, target = image.to(device), target.to(device)
+            output = model(image)
+            output = output["out"]
+            confmat.update(target.flatten(), output.argmax(1).flatten())
+
+            image_file = "{}/images/{}".format(root, index)
+            target_file = "{}/targets/{}".format(root, index)
+            output_file = "{}/outputs/{}".format(root, index)
+            np.save(file=image_file, arr=image.detach().cpu().numpy())
+            np.save(file=target_file, arr=target.detach().cpu().numpy())
+            np.save(file=output_file, arr=output.detach().cpu().numpy())
+
+        confmat.reduce_from_all_processes()
+    return confmat
 
 def main(args):
 
-    folder_name = str(args.model) + str(args.backbone)
+    results_root = Path('/home/AD/rraina/segmentation_benchmark/semseg/outputs/')
+    output_subdir = Path("{}_{}_eval".format(args.backbone, args.arch))
+    results_root = results_root / output_subdir
+    results_root.mkdir(exist_ok=True, parents=True)
+    while True:
+        output_root = Path("%s/%s" % (results_root, generate_rand_string(6)))
+        if not os.path.exists(output_root):
+            break
 
-    # Path to save logits
-    logit_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "logit",
-    )
-    utils.mkdir(logit_dir)
-    print("Logit dst:", logit_dir)
+    images_dir = output_root / "images"
+    targets_dir = output_root / "targets"
+    output_images_dir = output_root / "outputs"
 
-    # Path to save images
-    image_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "image",
-    )
-    utils.mkdir(image_dir)
-    print("Image dst:", image_dir)
-
-    # Path to save processed images
-    processed_image_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "processed_image",
-    )
-    utils.mkdir(processed_image_dir)
-    print("Processed Image dst:", processed_image_dir)
-
-    # Path to ground truth images
-    ground_truth_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "ground_truth",
-    )
-    utils.mkdir(ground_truth_dir)
-    print("Ground truth dst:", ground_truth_dir)
-
-    # Path to prediction images
-    prediction_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "prediction",
-    )
-    utils.mkdir(prediction_dir)
-    print("Prediction dst:", prediction_dir)
-
-    # Path to target images
-    target_dir = os.path.join(
-        args.output_dir,
-        "features",
-        "voc12",
-        folder_name.lower(),
-        "val",
-        "target",
-    )
-    utils.mkdir(target_dir)
-    print("Target dst:", target_dir)
-
-    # Path to save scores
-    save_dir = os.path.join(
-        args.output_dir,
-        "scores",
-        "voc12",
-        folder_name.lower(),
-        "val",
-    )
-    utils.mkdir(save_dir)
-    save_path = os.path.join(save_dir, "scores.json")
-    print("Score dst:", save_path)
-
-    if args.output_dir:
-        utils.mkdir(args.output_dir)
+    output_root.mkdir(exist_ok=True, parents=True)
+    images_dir.mkdir(exist_ok=True, parents=True)
+    targets_dir.mkdir(exist_ok=True, parents=True)
+    output_images_dir.mkdir(exist_ok=True, parents=True)
+    
+    print("Output directory: {}".format(output_root))
+    print("Images directory: {}".format(images_dir))
+    print("Targets directory: {}".format(targets_dir))
+    print("Outputs directory: {}".format(output_images_dir))
 
     utils.init_distributed_mode(args)
-
     print(args)
-
-    iterator = utils.Iterator()
 
     device = torch.device(args.device)
 
-    dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform(train=False))
+    dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform())
 
     if args.distributed:
-        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
+        test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test, shuffle=False)
     else:
         test_sampler = torch.utils.data.SequentialSampler(dataset_test)
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1, shuffle=False,
-        sampler=test_sampler, num_workers=args.workers,
-        collate_fn=utils.collate_fn)
+        dataset_test, batch_size=1, sampler=test_sampler, num_workers=args.workers, collate_fn=utils.collate_fn
+    )
 
+    model = load_model(
+        arch_type=args.arch, 
+        backbone=args.backbone, 
+        pretrained=args.pretrained, 
+        progress=True, 
+        num_classes=num_classes, 
+        aux_loss=args.aux_loss, 
+        divnorm_fsize=5,
+    )
 
-    model = _load_model(arch_type=args.model, 
-                      backbone=args.backbone,
-                      pretrained=False,
-                      progress=True, 
-                      num_classes=num_classes, 
-                      aux_loss=args.aux_loss)
-
-    model.to(torch.device('cuda'))
-
+    model.to(device)
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model_without_ddp = model
-
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
-
-    params_to_optimize = [
-        {"params": [p for p in model_without_ddp.backbone.parameters() if p.requires_grad]},
-        {"params": [p for p in model_without_ddp.classifier.parameters() if p.requires_grad]},
-    ]
-
-    if args.aux_loss:
-        params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
-        params_to_optimize.append({"params": params, "lr": args.lr * 10})
     
-    optimizer = torch.optim.SGD(
-        params_to_optimize,
-        lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    if args.resume:
+        checkpoint = torch.load(args.resume, map_location="cpu")
+        model_without_ddp.load_state_dict(checkpoint["model"])
 
-    checkpoint = torch.load("/home/AD/rraina/segmentation_benchmark/semseg/output_models/checkpoint.pth", map_location='cpu')
-    model_without_ddp.load_state_dict(checkpoint['model'])
-    optimizer.load_state_dict(checkpoint['optimizer'])
-
-    model.eval()
-    
     start_time = time.time()
 
-    confmat = utils.ConfusionMatrix(num_classes)
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Test:'
-
-    with torch.no_grad():
-        for idx, (image, target) in tqdm(enumerate(dataset_test)):
-            image, target = image.to(device), target.to(device)
-            image = image.unsqueeze(0)
-            target = target.unsqueeze(0)
-            output = model(image)
-            output = output['out']
-
-            # Saving Logits
-            filename = os.path.join(logit_dir, str(idx) + ".npy")
-            np.save(filename, output.cpu().numpy())
-
-            # Saving Ground Truths
-            ground_truth = Image.open(str(data_loader_test.dataset.masks[idx]))
-            filename = os.path.join(ground_truth_dir, str(idx) + ".png")
-            ground_truth.save(str(filename))
-
-            # Saving Images
-            images = Image.open(str(data_loader_test.dataset.images[idx]))
-            filename = os.path.join(image_dir, str(idx) + ".png")
-            images.save(str(filename))
-
-            # Saving Processed Image
-            processed_image_in = image[0].cpu().numpy().transpose(1, 2, 0)
-            processed_image = Image.fromarray((processed_image_in * 255).astype(np.uint8))
-            filename = os.path.join(processed_image_dir, str(idx) + ".png")
-            processed_image.save(str(filename))
-
-            # Saving Target Image
-            target_in = target[0].cpu().numpy()
-            target_image = Image.fromarray(np.uint8(target_in * 255) , 'L')
-            filename = os.path.join(target_dir, str(idx) + ".png")
-            target_image.save(str(filename))
-
-            # Saving Prediction Image
-            prediction_in = get_mask(output)
-            prediction_image = Image.fromarray((prediction_in * 255).astype(np.uint8))
-            filename = os.path.join(prediction_dir, str(idx) + ".png")
-            prediction_image.save(str(filename))
-
-            confmat.update(target.flatten(), output.argmax(1).flatten())
-
-        confmat.reduce_from_all_processes()
-
-    with open(save_path, "w") as f:
-        print(confmat, file=f)
-    
+    confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, root=output_root)
+    print(confmat)
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    print('Evaluation time {}'.format(total_time_str))
-    
+    print(f"Evaluation time {total_time_str}")
 
 def get_args_parser(add_help=True):
     import argparse
-    parser = argparse.ArgumentParser(description='PyTorch Segmentation Training', add_help=add_help)
 
-    parser.add_argument('--data-path', default='/home/AD/rraina/segmentation_benchmark/', help='dataset path')
-    parser.add_argument('--dataset', default='coco', help='dataset name')
-    parser.add_argument('--model', default='deeplabv3', help='model')
-    parser.add_argument('--backbone', default='resnet101', help='backbone')
-    parser.add_argument('--aux-loss', action='store_true', help='auxiliar loss')
-    parser.add_argument('--device', default='cuda', help='device')
-    parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
-                        help='number of data loading workers (default: 16)')
-    parser.add_argument('--lr', default=0.01, type=float, help='initial learning rate')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                        help='momentum')
-    parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
-                        metavar='W', help='weight decay (default: 1e-4)',
-                        dest='weight_decay')
-    parser.add_argument('--print-freq', default=10, type=int, help='print frequency')
-    parser.add_argument('--output-dir', default='/home/AD/rraina/segmentation_benchmark/semseg/output', help='path where to save')
+    parser = argparse.ArgumentParser(description="PyTorch Segmentation Training", add_help=add_help)
+    parser.add_argument("--arch", default="deeplabv3", type=str, help="model name")
+    parser.add_argument("--backbone", default="resnet50", type=str, help="backbone name")
+    parser.add_argument("--aux-loss", action="store_true", help="auxiliar loss")
+    parser.add_argument("--data-path", default="/home/AD/rraina/segmentation_benchmark/benchmark_RELEASE", type=str, help="dataset path")
+    parser.add_argument("--dataset", default="coco", type=str, help="dataset name")
+    parser.add_argument("--model", default="fcn_resnet101", type=str, help="model name")
+    parser.add_argument("--device", default="cuda", type=str, help="device (Use cuda or cpu Default: cuda)")
+    parser.add_argument(
+        "-b", "--batch-size", default=8, type=int, help="images per gpu, the total batch size is $NGPU x batch_size"
+    )
+    parser.add_argument("--epochs", default=30, type=int, metavar="N", help="number of total epochs to run")
+
+    parser.add_argument(
+        "-j", "--workers", default=16, type=int, metavar="N", help="number of data loading workers (default: 16)"
+    )
+    parser.add_argument("--lr", default=0.01, type=float, help="initial learning rate")
+    parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
+    parser.add_argument(
+        "--wd",
+        "--weight-decay",
+        default=1e-4,
+        type=float,
+        metavar="W",
+        help="weight decay (default: 1e-4)",
+        dest="weight_decay",
+    )
+    parser.add_argument(
+        "--pretrained",
+        dest="pretrained",
+        help="Use pre-trained models from the modelzoo",
+        action="store_true",
+    )
+    parser.add_argument("--print-freq", default=10, type=int, help="print frequency")
+    parser.add_argument("--output", default=".", type=str, help="path to save outputs")
+    parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     # distributed training parameters
-    parser.add_argument('--world-size', default=1, type=int,
-                        help='number of distributed processes')
-    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+    parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
+    parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
 
     return parser
 

@@ -29,7 +29,7 @@ for j in $(seq 2 1 2); do \
             low="$(echo "scale=1;$high-0.1" | bc)"
         fi
 
-        output_path=/home/AD/rraina/segmentation_benchmark/semseg/outputs/${model}_imagenet_100_occlusion_${low}_${high}.csv
+        output_path=/home/AD/rraina/segmentation_benchmark/semseg/outputs/
 
         python3 /home/AD/rraina/segmentation_benchmark/semseg/backbone_eval_vgg_occlusion.py \
             --data '/mnt/cube/projects/imagenet_100/' \

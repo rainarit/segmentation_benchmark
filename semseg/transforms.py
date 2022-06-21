@@ -70,7 +70,10 @@ class Resize:
         Returns:
             PIL Image or Tensor: Rescaled image.
         """
-        return F.resize(img, self.size, self.interpolation, self.max_size, self.antialias), target
+        image = F.resize(img, self.size)
+        target = F.resize(target, self.size, interpolation=T.InterpolationMode.NEAREST)
+        return image, target
+        #return F.resize(img, self.size, self.interpolation, self.max_size, self.antialias), target
 
     def __repr__(self) -> str:
         detail = f"(size={self.size}, interpolation={self.interpolation.value}, max_size={self.max_size}, antialias={self.antialias})"
@@ -145,6 +148,12 @@ class Normalize:
 
     def __call__(self, image, target):
         image = F.normalize(image, mean=self.mean, std=self.std)
+        return image, target
+
+class PILToTensor:
+    def __call__(self, image, target):
+        image = F.pil_to_tensor(image)
+        target = torch.as_tensor(np.array(target), dtype=torch.int64)
         return image, target
 
 class ColorJitter:
@@ -356,9 +365,8 @@ class Occlude:
       return i, j, erase_h, erase_w, value
     return 0, 0, 
     
-  def __call__(self, img, target) -> Tensor:
+  def __call__(self, img, target):
     if isinstance(img, Image.Image):
       img = F.to_tensor(img)
     i, j, erase_h, erase_w, value = self.get_params(img=img, scale=self.scale, value=self.value)
-    img = F.erase(img, i, j, erase_h, erase_w, value, True)
-    return img, target
+    return F.erase(img, i, j, erase_h, erase_w, value, True), target
