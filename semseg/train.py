@@ -47,7 +47,7 @@ def get_transform(train, args):
 def criterion(inputs, target):
     losses = {}
     for name, x in inputs.items():
-        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255)
+        losses[name] = nn.functional.cross_entropy(x, target, ignore_index=255, reduction='mean')
 
     if len(losses) == 1:
         return losses["out"]
@@ -83,27 +83,36 @@ def evaluate(model, data_loader, device, num_classes, root):
 
     return confmat
 
-def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, scaler=None):
+def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, scaler):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
     header = f"Epoch: [{epoch}]"
+
     for image, target in metric_logger.log_every(data_loader, print_freq, header):
         image, target = image.to(device), target.to(device)
-        with torch.cuda.amp.autocast(enabled=scaler is not None):
+
+        optimizer.zero_grad()
+        with torch.cuda.amp.autocast():
             output = model(image)
             loss = criterion(output, target)
 
-        optimizer.zero_grad()
-        if scaler is not None:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            loss.backward()
-            optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         lr_scheduler.step()
+
+        # Clamping parameters of divnorm to non-negative values
+        if "divnorm" in str(args.backbone):
+            if args.distributed:
+                div_conv_weight = model.module.backbone.div.div.weight.data
+                div_conv_weight = div_conv_weight.clamp(min=0.)
+                model.module.backbone.div.div.weight.data = div_conv_weight
+            else:
+                div_conv_weight = model.backbone.div.div.weight.data
+                div_conv_weight = div_conv_weight.clamp(min=0.)
+                model.backbone.div.div.weight.data = div_conv_weight
 
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
 
@@ -118,17 +127,23 @@ def main(args):
             if not os.path.exists(output_root):
                 break
         output_root.mkdir(exist_ok=True, parents=True)
+    
+    seed=args.seed
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    g = torch.Generator()
+    g.manual_seed(seed)
 
     utils.init_distributed_mode(args)
     print(args)
 
     device = torch.device(args.device)
-
-    if args.use_deterministic_algorithms:
-        torch.backends.cudnn.benchmark = False
-        torch.use_deterministic_algorithms(True)
-    else:
-        torch.backends.cudnn.benchmark = True
 
     dataset, num_classes = get_dataset(args.data_path, args.dataset, "train_noval", get_transform(True, args))
     dataset_test, _ = get_dataset(args.data_path, args.dataset, "val", get_transform(False, args))
@@ -150,7 +165,11 @@ def main(args):
     )
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1, sampler=test_sampler, num_workers=args.workers, collate_fn=utils.collate_fn
+        dataset_test, 
+        batch_size=1, 
+        sampler=test_sampler, 
+        num_workers=args.workers, 
+        collate_fn=utils.collate_fn
     )
 
     model = load_model(
@@ -169,7 +188,7 @@ def main(args):
 
     model_without_ddp = model
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
 
     params_to_optimize = [
@@ -179,7 +198,12 @@ def main(args):
     if args.aux_loss:
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
-    optimizer = torch.optim.SGD(params_to_optimize, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    
+    optimizer = torch.optim.SGD(
+        params_to_optimize, 
+        lr=args.lr, 
+        momentum=args.momentum, 
+        weight_decay=args.weight_decay)
 
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
 
@@ -228,6 +252,7 @@ def main(args):
 
         if args.distributed:
             train_sampler.set_epoch(epoch)
+
         train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, args.print_freq, scaler)
         confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, root=epoch_dir)
         print(confmat)
@@ -263,6 +288,7 @@ def get_args_parser(add_help=True):
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training", add_help=add_help)
 
     parser.add_argument("--data-path", default="/datasets01/COCO/022719/", type=str, help="dataset path")
+    parser.add_argument('--seed', default=429, type=float, help='seed')
     parser.add_argument("--dataset", default="coco", type=str, help="dataset name")
     parser.add_argument("--arch", default="deeplabv3", type=str, help="model name")
     parser.add_argument("--backbone", default="resnet50", type=str, help="backbone name")
@@ -303,9 +329,6 @@ def get_args_parser(add_help=True):
         help="Only test the model",
         action="store_true",
     )
-    parser.add_argument(
-        "--use-deterministic-algorithms", action="store_true", help="Forces the use of deterministic algorithms only."
-    )
     # distributed training parameters
     parser.add_argument("--world-size", default=1, type=int, help="number of distributed processes")
     parser.add_argument("--dist-url", default="env://", type=str, help="url used to set up distributed training")
@@ -314,7 +337,6 @@ def get_args_parser(add_help=True):
     parser.add_argument("--amp", action="store_true", help="Use torch.cuda.amp for mixed precision training")
 
     return parser
-
 
 if __name__ == "__main__":
     args = get_args_parser().parse_args()

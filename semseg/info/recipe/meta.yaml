@@ -1,0 +1,53 @@
+# This file created by conda-build 2.1.18
+# meta.yaml template originally from:
+# /recipe_root, last modified Sun Mar 25 16:43:52 2018
+# ------------------------------------------------
+
+package:
+    name: pydensecrf
+    version: 1.0rc2
+source:
+    sha256: c0d98dfa660d01056898a01ed7e9ca77fd9a5ef6440dd3b108142dd899c0ff5f
+    url: https://pypi.io/packages/source/p/pydensecrf/pydensecrf-1.0rc2.tar.gz
+build:
+    noarch: ''
+    noarch_python: false
+    number: '0'
+    script: python -m pip install --no-deps --ignore-installed .
+    string: py36_0
+requirements:
+    build:
+        - certifi 2018.1.18 py36_0
+        - python 3.6.4 0
+        - xz 5.2.3 0
+        - openssl 1.0.2n 0
+        - pip 9.0.1 py36_1
+        - readline 7.0 0
+        - zlib 1.2.11 0
+        - tk 8.6.7 0
+        - setuptools 39.0.1 py36_0
+        - cython 0.28.1 py36_0
+        - ca-certificates 2018.1.18 0
+        - ncurses 5.9 10
+        - wheel 0.30.0 py36_2
+        - sqlite 3.20.1 2
+        - toolchain 2.1.2 0
+    run:
+        - python
+test:
+    commands:
+        - conda inspect linkages -p $PREFIX $PKG_NAME
+    imports:
+        - pydensecrf
+    requires:
+        - numpy
+about:
+    home: http://github.com/lucasb-eyer/pydensecrf
+    license: MIT
+    license_family: MIT
+    summary: "A python interface to Philipp Kr\xE4henb\xFChl's fully-connected (dense)\
+        \ CRF code."
+extra:
+    final: true
+    recipe-maintainers:
+        - ocefpaf

@@ -193,7 +193,14 @@ class ResNet_DivNorm(nn.Module):
         if self.use_exc_inh:
             if backbone_name.find('ei') > backbone_name.find('divnorm'):
                 print("-- DivNormEI")
-                self.div = DivNormEI(64, None, None, None, None, divnorm_fsize=self.divnorm_fsize, gaussian_init=False, groups=1)
+                self.div = DivNormEI(
+                    in_channels=64, 
+                    divnorm_fsize=self.divnorm_fsize,
+                    exc_fsize=7,
+                    inh_fsize=5,
+                    padding_mode='zeros',
+                    groups=1, 
+                    gaussian_init=False)
             else:
                 print("-- EIDivNorm")
                 self.div = EIDivNorm(64, 7, 5, 'zeros', self.divnorm_fsize, groups=1)
