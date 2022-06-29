@@ -93,6 +93,7 @@ class DenseCRF(object):
 
 def main(args):
     utils.init_distributed_mode(args)
+    args.distributed = True
     print(args)
 
     results_root = Path(args.output_dir)
@@ -123,15 +124,20 @@ def main(args):
     print("Logit src:", logit_dir)
 
     # Path to save scores
-    save_dir = results_root / "crf_scores"
+    save_dir = results_root / "crf"
     save_dir.mkdir(exist_ok=True, parents=True)
-
     save_path = save_dir / "scores_crf.json"
     print("Score dst:", save_path)
 
+    # Path to save crf images
+    save_dir_images = save_dir / "images"
+    save_dir_images.mkdir(exist_ok=True, parents=True)
+
     dataset_test, num_classes = get_dataset(args.data_path, args.dataset, "val", get_transform(False, args))
 
-    confmat = utils.ConfusionMatrix(num_classes)
+    confmat_precrf = utils.ConfusionMatrix(num_classes)
+    confmat_postcrf = utils.ConfusionMatrix(num_classes)
+
 
     # Process per sample
     def process(i):
@@ -153,20 +159,30 @@ def main(args):
         prob = postprocessor(image, prob)
         
         label = np.argmax(prob, axis=0)
-        np.save(save_dir / str(str(i) + '.npy'), label)
+        np.save(save_dir_images /str(str(i) + '.npy'), label)
 
-        return label, target
+        return image, target, logit, label
 
     for i in tqdm(range(len(dataset_test))):
-        image, target = process(i)
-        confmat.update(target.flatten(), image.flatten())
+        image, target, logit, crf = process(i)
+        confmat_precrf.update(target.flatten(), logit.argmax(1).flatten())
+        confmat_postcrf.update(target.flatten(), crf.flatten())
         if i % 10 == 0 and i > 0:
-            print(confmat)
+            print("")
+            print("Pre-CRF --- ")
+            print(confmat_precrf)
+            print("----------------------------")
+            print("Post-CRF --- ")
+            print(confmat_postcrf)
     
-    confmat.reduce_from_all_processes()
+    confmat_precrf.reduce_from_all_processes()
+    confmat_postcrf.reduce_from_all_processes()
 
     with open(save_path, "w") as f:
-        print(confmat, file=f)
+        print("Pre-CRF Results: ", file=f)
+        print(confmat_precrf, file=f)
+        print("Post-CRF Results: ", file=f)
+        print(confmat_postcrf, file=f)
     
 def get_args_parser(add_help=True):
     import argparse

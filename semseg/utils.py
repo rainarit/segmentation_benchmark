@@ -120,10 +120,10 @@ class ConfusionMatrix:
 
     def __str__(self):
         acc_global, acc, iu = self.compute()
-        return ("global correct: {:.1f}\naverage row correct: {}\nIoU: {}\nmean IoU: {:.1f}").format(
+        return ("global correct: {:.9f}\naverage row correct: {}\nIoU: {}\nmean IoU: {:.9f}").format(
             acc_global.item() * 100,
-            [f"{i:.1f}" for i in (acc * 100).tolist()],
-            [f"{i:.1f}" for i in (iu * 100).tolist()],
+            [f"{i:.9f}" for i in (acc * 100).tolist()],
+            [f"{i:.9f}" for i in (iu * 100).tolist()],
             iu.mean().item() * 100,
         )
 

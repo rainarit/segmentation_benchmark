@@ -22,9 +22,18 @@ class SegmentationPresetTrain:
     def __call__(self, img, target):
         return self.transforms(img, target)
 
-
 class SegmentationPresetEval:
-    def __init__(self, *, base_size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    def __init__(self, *, base_size, 
+                 mean=(0.485, 0.456, 0.406), 
+                 std=(0.229, 0.224, 0.225), 
+                 jitter=False,
+                 contrast_min=1.0,
+                 contrast_max=1.0,
+                 brightness_min=1.0,
+                 brightness_max=1.0,
+                 occlude_min=0.0, 
+                 occlude_max=0.0):
+
         self.transforms = T.Compose(
             [
                 T.RandomResize(base_size, base_size),
@@ -33,6 +42,21 @@ class SegmentationPresetEval:
                 T.Normalize(mean=mean, std=std),
             ]
         )
+
+        if jitter:
+            transformations = [
+                 T.RandomResize(base_size, base_size),
+                 T.PILToTensor(),
+                 T.ConvertImageDtype(torch.float),
+                 T.ColorJitter(contrast=(contrast_min, contrast_max), brightness=(brightness_min, brightness_max))
+            ]
+            if occlude_max > 0.0:
+                transformations.append(
+                    T.Occlude(occlude_min, occlude_max, 0.)
+                )
+            transformations.append(T.Normalize(mean=mean, std=std))
+            self.transforms = T.Compose(transformations)   
+
 
     def __call__(self, img, target):
         return self.transforms(img, target)
