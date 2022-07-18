@@ -2,6 +2,7 @@
 import torch  # pylint: disable=import-error
 import torch.nn as nn  # pylint: disable=import-error
 import torch.nn.functional as F  # pylint: disable=import-error
+import numpy as np
 
 
 def nonnegative_weights_init(m):
@@ -21,8 +22,6 @@ class DaleRNNcell(nn.Module):
 
     def __init__(self,
                  in_channels,
-                 in_h=None,
-                 in_w=None,
                  hidden_dim=None,
                  divnorm_fsize=3,
                  exc_fsize=5,
@@ -43,24 +42,24 @@ class DaleRNNcell(nn.Module):
             bias=False)
         # recurrent gates computation
         self.g_exc_x = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
-        self.ln_e_x = nn.LayerNorm([self.hidden_dim, in_h, in_w])
+        self.ln_e_x = nn.GroupNorm(num_groups=1, num_channels=self.hidden_dim)
         self.g_exc_e = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1)
-        self.ln_e_e = nn.LayerNorm([self.hidden_dim, in_h, in_w])
+        self.ln_e_e = nn.GroupNorm(num_groups=1, num_channels=self.hidden_dim)
         self.g_inh_x = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
-        self.ln_i_x = nn.LayerNorm([self.hidden_dim, in_h, in_w])
+        self.ln_i_x = nn.GroupNorm(num_groups=1, num_channels=self.hidden_dim)
         self.g_inh_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1)
-        self.ln_i_i = nn.LayerNorm([self.hidden_dim, in_h, in_w])
-        self.ln_out = nn.LayerNorm([self.hidden_dim, in_h, in_w])
+        self.ln_i_i = nn.GroupNorm(num_groups=1, num_channels=self.hidden_dim)
+        self.ln_out = nn.GroupNorm(num_groups=1, num_channels=self.hidden_dim)
         # feedforward stimulus drive
-        self.w_exc_x = nn.Conv2d(self.in_channels, self.hidden_dim, exc_fsize, padding=(exc_fsize-1) // 2)
-        self.w_inh_x = nn.Conv2d(self.in_channels, self.hidden_dim, exc_fsize, padding=(exc_fsize-1) // 2)
+        self.w_exc_x = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
+        self.w_inh_x = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
 
         # horizontal connections (e->e, i->e, i->i, e->i)
-        self.w_exc_e = nn.Conv2d(self.hidden_dim, self.hidden_dim, exc_fsize, padding=(exc_fsize-1) // 2)
+        self.w_exc_ei = nn.Conv2d(self.hidden_dim * 2, self.hidden_dim, exc_fsize, padding=(exc_fsize-1) // 2)
         # disynaptic inhibition with pairs of E-I cells, E -> exciting surround I -> inhibiting surround E
-        self.w_exc_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1)
-        self.w_inh_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, inh_fsize, padding=(inh_fsize-1) // 2)
-        self.w_inh_e = nn.Conv2d(self.hidden_dim, self.hidden_dim, inh_fsize, padding=(inh_fsize-1) // 2)
+        # self.w_exc_i = nn.Conv2d(self.hidden_dim, self.hidden_dim, 1)
+        self.w_inh_ei = nn.Conv2d(self.hidden_dim * 2, self.hidden_dim, inh_fsize, padding=(inh_fsize-1) // 2)
+        # self.w_inh_e = nn.Conv2d(self.hidden_dim, self.hidden_dim, inh_fsize, padding=(inh_fsize-1) // 2)
         nonnegative_weights_init(self.div)
         
     def forward(self, input, hidden):
@@ -68,9 +67,9 @@ class DaleRNNcell(nn.Module):
       exc, inh = hidden
       g_exc = torch.sigmoid(self.ln_e_x(self.g_exc_x(input)) + self.ln_e_e(self.g_exc_e(exc)))
       g_inh = torch.sigmoid(self.ln_i_x(self.g_inh_x(input)) + self.ln_i_i(self.g_inh_i(inh)))
-      e_hat_t = torch.relu(self.w_exc_x(input) + self.w_exc_e(exc) - self.w_exc_i(inh))
+      e_hat_t = torch.relu(self.w_exc_x(input) + self.w_exc_ei(torch.cat((exc, inh), 1)))
       # Add a scalar multiplier to i_hat_t to control sub-contrast regime normalization?
-      i_hat_t = torch.relu(self.w_inh_x(input) + self.w_inh_e(exc) - self.w_inh_i(inh))
+      i_hat_t = torch.relu(self.w_inh_x(input) + self.w_inh_ei(torch.cat((exc, inh), 1)))
       exc = F.relu(g_exc * e_hat_t + (1 - g_exc) * exc)
       inh = F.relu(g_inh * i_hat_t + (1 - g_inh) * inh)
       norm = self.div(exc) + 1e-5
@@ -81,10 +80,9 @@ class DaleRNNcell(nn.Module):
 class DaleRNNLayer(nn.Module):
   def __init__(self, 
                in_channels,
-               in_h, in_w,
                hidden_dim=None,
                divnorm_fsize=3,
-               exc_fsize=7,
+               exc_fsize=5,
                inh_fsize=3,
                timesteps=4,
                device='cuda',
@@ -92,8 +90,6 @@ class DaleRNNLayer(nn.Module):
                ):
     super(DaleRNNLayer, self).__init__()
     self.in_channels = in_channels
-    self.in_h = in_h
-    self.in_w = in_w
     self.hidden_dim = hidden_dim
     self.divnorm_fsize = divnorm_fsize
     self.exc_fsize = exc_fsize
@@ -101,7 +97,6 @@ class DaleRNNLayer(nn.Module):
     self.timesteps = timesteps
     self.device = device
     self.rnn_cell = DaleRNNcell(in_channels=self.in_channels,
-                            in_h=self.in_h, in_w=self.in_w,
                             hidden_dim=self.hidden_dim,
                             divnorm_fsize=self.divnorm_fsize,
                             exc_fsize=self.exc_fsize,
