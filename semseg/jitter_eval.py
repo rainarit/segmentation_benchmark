@@ -164,7 +164,7 @@ def Model(arch_type, backbone, num_classes, divnorm_fsize, checkpoint, distribut
         params = [p for p in model_without_ddp.aux_classifier.parameters() if p.requires_grad]
         params_to_optimize.append({"params": params, "lr": args.lr * 10})
     
-    checkpoint = torch.load(str(checkpoint), map_location='cuda:0')
+    checkpoint = torch.load(str(checkpoint), map_location='cpu')
     model_without_ddp.load_state_dict(checkpoint['model'])
 
     #try:

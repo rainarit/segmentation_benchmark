@@ -85,19 +85,45 @@ def evaluate(model, data_loader, device, num_classes, root):
 
 def main(args):
     results_root = Path(dirname(args.resume))
-    if args.contrast_max > 0:
-        args.pertub = 'contrast'
-        results_root = results_root / "jitter" / str(args.pertub) /"({},{})".format(args.contrast_min, args.contrast_max)
-    if args.brightness_max > 0:
-        args.pertub = 'brightness'
-        results_root = results_root / "jitter" / str(args.pertub) /"({},{})".format(args.brightness_min, args.brightness_max)
-    if args.occlude_max > 1.0:
-        args.pertub = 'occlude'
-        results_root = results_root / "jitter" / str(args.pertub) /"({},{})".format(args.occlude_min, args.occlude_max)
+
+    results_root = results_root / "jitter"
     results_root.mkdir(exist_ok=True, parents=True)
 
+    if args.contrast_max > 1.0 and args.contrast_min >= 0.0:
+        args.pertub = 'contrast'
+        results_root = results_root / str(args.pertub)
+        results_root.mkdir(exist_ok=True, parents=True)
+        results_root = results_root /"({},{})".format(args.contrast_min, args.contrast_max)
+        results_root.mkdir(exist_ok=True, parents=True)
+    if args.brightness_max > 1.0 and args.brightness_min >= 0.0:
+        args.pertub = 'brightness'
+        results_root = results_root / str(args.pertub)
+        results_root.mkdir(exist_ok=True, parents=True)
+        results_root = results_root /"({},{})".format(args.brightness_min, args.brightness_max)
+        results_root.mkdir(exist_ok=True, parents=True)
+    if args.occlude_max > 0 and args.occlude_min >= 0:
+        args.pertub = 'occlude'
+        results_root = results_root / str(args.pertub)
+        results_root.mkdir(exist_ok=True, parents=True)
+        results_root = results_root / str(args.pertub) /"({},{})".format(args.occlude_min, args.occlude_max)
+        results_root.mkdir(exist_ok=True, parents=True)
+
+    images_dir = results_root / "images"
+    images_image_dir = images_dir / "image"
+    images_target_dir = images_dir / "target"
+    images_output_dir = images_dir / "output"
+    images_dir.mkdir(exist_ok=True, parents=True)
+    images_image_dir.mkdir(exist_ok=True, parents=True)
+    images_target_dir.mkdir(exist_ok=True, parents=True)
+    images_output_dir.mkdir(exist_ok=True, parents=True)
+
     print("Result stored dir: ", results_root)
-    
+
+    print(images_dir)
+    print(images_image_dir)
+    print(images_target_dir)
+    print(images_output_dir)
+
     seed=args.seed
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -112,6 +138,7 @@ def main(args):
 
     utils.init_distributed_mode(args)
     print(args)
+
 
     device = torch.device(args.device)
 
@@ -150,27 +177,26 @@ def main(args):
         model_without_ddp = model.module
 
     if args.resume:
-        checkpoint = torch.load(args.resume, map_location="cpu")
-        model_without_ddp.load_state_dict(checkpoint["model"])
+        checkpoint = torch.load(str(args.resume), map_location='cpu')
+        model_without_ddp.load_state_dict(checkpoint['model'])
 
-    confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, root=results_root)
     start_time = time.time()
+    confmat = evaluate(model, data_loader_test, device=device, num_classes=num_classes, root=results_root)
+    total_time = time.time() - start_time
+    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+    print(f"Evaluating time: {total_time_str}")
 
     print(confmat)
 
     mean_iou_file = open(results_root / 'mean_ious.csv', 'w')
     with mean_iou_file:   
         write = csv.writer(mean_iou_file)
-        write.writerows([float(confmat.get_mean_iou())])
-    
-    total_time = time.time() - start_time
-    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    print(f"Training time {total_time_str}")
+        write.writerows(map(lambda x: [x], [float(confmat.get_mean_iou())]))
 
 def get_args_parser(add_help=True):
     import argparse
 
-    parser = argparse.ArgumentParser(description="PyTorch Segmentation Training", add_help=add_help)
+    parser = argparse.ArgumentParser(description="PyTorch Segmentation Evaluation on Jitter Pertubations", add_help=add_help)
 
     parser.add_argument("--data-path", default="/datasets01/COCO/022719/", type=str, help="dataset path")
     parser.add_argument('--seed', default=429, type=float, help='seed')
@@ -187,10 +213,10 @@ def get_args_parser(add_help=True):
     parser.add_argument("--jitter", default="contrast", type=str, help="jitter name")
     parser.add_argument("--contrast-min", default=1.0, type=float, help="contrast_min")
     parser.add_argument("--contrast-max", default=1.0, type=float, help="contrast_max")
-    parser.add_argument("--brightness-min", default=1.0, type=float, help="brightness_min")
-    parser.add_argument("--brightness-min", default=1.0, type=float, help="brightness_max")
-    parser.add_argument("--occlude-min", default=0.0, type=float, help="occlude_min")
-    parser.add_argument("--occlude-max", default=0.0, type=float, help="occlude_max")
+    parser.add_argument("--brightness-min", default=1.0, help="brightness_min")
+    parser.add_argument("--brightness-max", default=1.0, help="brightness_max")
+    parser.add_argument("--occlude-min", default=0.0, help="occlude_min")
+    parser.add_argument("--occlude-max", default=0.0, help="occlude_max")
     parser.add_argument("--device", default="cuda", type=str, help="device (Use cuda or cpu Default: cuda)")
 
     parser.add_argument(

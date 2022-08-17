@@ -2,6 +2,7 @@ from .._utils import IntermediateLayerGetter
 from ..utils import load_state_dict_from_url
 from .. import resnet
 from .. import resnet_divnorm
+from .. import resnet_dalernn
 
 
 from .fcn import FCN, FCNHead
@@ -19,7 +20,7 @@ model_urls = {
 }
 
 
-def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained_backbone=True):
+def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, hidden_dim, exc_fsize, inh_fsize, timesteps, temporal_agg, pretrained_backbone=True):
     if 'divnorm' in backbone_name:
         resnet_name = backbone_name.split("_")[0]
         layer_name = backbone_name.split("_")[1]
@@ -46,6 +47,26 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
         aux_layer = 'layer3'
         aux_inplanes = 1024
 
+    if 'dalernn' in backbone_name:
+        resnet_name = backbone_name.split("_")[0]
+        layer_name = backbone_name.split("_")[1]
+        backbone = resnet_dalernn.__dict__[resnet_name](
+            backbone_name=backbone_name,
+            pretrained=pretrained_backbone,
+            replace_stride_with_dilation=[False, True, True], 
+            divnorm_fsize=divnorm_fsize, 
+            hidden_dim = hidden_dim,
+            exc_fsize=exc_fsize,
+            inh_fsize=inh_fsize,
+            timesteps=timesteps,
+            temporal_agg=temporal_agg,
+        )
+            
+        out_layer = 'layer4'
+        out_inplanes = 2048
+        aux_layer = 'layer3'
+        aux_inplanes = 1024
+
     elif 'resnet' in backbone_name:
         backbone = resnet.__dict__[backbone_name](
             pretrained=pretrained_backbone,
@@ -61,7 +82,7 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
     if aux:
         return_layers[aux_layer] = 'aux'
     
-    if 'divnorm' not in backbone_name:
+    if 'divnorm' or 'dalernn' not in backbone_name:
         backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
     aux_classifier = None
@@ -78,11 +99,11 @@ def _segm_model(name, backbone_name, num_classes, aux, divnorm_fsize, pretrained
     model = base_model(backbone, classifier, aux_classifier)
     return model
 
-def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss, divnorm_fsize, **kwargs):
+def _load_model(arch_type, backbone, pretrained, progress, num_classes, aux_loss, divnorm_fsize, hidden_dim, exc_fsize, inh_fsize, timesteps, temporal_agg, **kwargs):
     if pretrained:
         aux_loss = True
         kwargs["pretrained_backbone"] = False
-    model = _segm_model(arch_type, backbone, num_classes, aux_loss, divnorm_fsize, **kwargs)
+    model = _segm_model(arch_type, backbone, num_classes, aux_loss, divnorm_fsize, hidden_dim, exc_fsize, inh_fsize, timesteps, temporal_agg, **kwargs)
     if pretrained:
         _load_weights(model, arch_type, backbone, progress)
     return model

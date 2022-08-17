@@ -78,7 +78,7 @@ class ConfusionMatrix:
         n = self.num_classes
         if self.mat is None:
             self.mat = torch.zeros((n, n), dtype=torch.int64, device=a.device)
-        with torch.inference_mode():
+        with torch.no_grad():
             k = (a >= 0) & (a < n)
             inds = n * a[k].to(torch.int64) + b[k]
             self.mat += torch.bincount(inds, minlength=n ** 2).reshape(n, n)
@@ -313,7 +313,6 @@ def init_distributed_mode(args):
         return
 
     args.distributed = True
-
 
     torch.cuda.set_device(args.gpu)
     args.dist_backend = "nccl"

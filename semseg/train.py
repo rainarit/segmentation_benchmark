@@ -60,7 +60,7 @@ def evaluate(model, data_loader, device, num_classes, root):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Test:"
     image_ious = []
-    with torch.inference_mode():
+    with torch.no_grad():
         for index, (image, target) in enumerate(metric_logger.log_every(data_loader, 100, header)):
             image, target = image.to(device), target.to(device)
             output = model(image)
@@ -142,6 +142,7 @@ def main(args):
 
     utils.init_distributed_mode(args)
     print(args)
+    print(output_root)
 
     device = torch.device(args.device)
 
@@ -179,7 +180,12 @@ def main(args):
         progress=True, 
         num_classes=num_classes, 
         aux_loss=args.aux_loss, 
-        divnorm_fsize=5,
+        divnorm_fsize=args.divnorm_fsize,
+        hidden_dim=64,
+        exc_fsize=5,
+        inh_fsize=3,
+        timesteps=4,
+        temporal_agg=False,
     )
 
     model.to(device)
@@ -308,6 +314,8 @@ def get_args_parser(add_help=True):
     parser.add_argument(
         "-j", "--workers", default=16, type=int, metavar="N", help="number of data loading workers (default: 16)"
     )
+    parser.add_argument("--divnorm-fsize", default=5, type=int, help="divnorm fsize"
+    )
     parser.add_argument("--lr", default=0.01, type=float, help="initial learning rate")
     parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
     parser.add_argument(
@@ -323,6 +331,7 @@ def get_args_parser(add_help=True):
     parser.add_argument("--output-dir", default=".", type=str, help="path to save outputs")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="start epoch")
+    parser.add_argument("--start-epoch-checkpoint", default="", type=str)
     parser.add_argument(
         "--test-only",
         dest="test_only",
