@@ -139,8 +139,8 @@ class DaleRNNLayer(nn.Module):
                                     inh_fsize=self.inh_fsize,
                                     device=self.device,
                                     init_=self.init_)
-        self.emb_exc = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
-        self.emb_inh = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
+        # self.emb_exc = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
+        # self.emb_inh = nn.Conv2d(self.in_channels, self.hidden_dim, 1)
         if temporal_agg:
             self.temporal_agg = nn.Parameter(torch.ones([1, self.timesteps]))
         else:
@@ -149,7 +149,8 @@ class DaleRNNLayer(nn.Module):
     def forward(self, input):
         outputs_e = []
         outputs_i = []
-        state = (self.emb_exc(input), self.emb_inh(input))
+        # state = (self.emb_exc(input), self.emb_inh(input))
+        state = (torch.zeros_like(input), torch.zeros_like(input))
         for _ in range(self.timesteps):
             state = self.rnn_cell(input, state)
             outputs_e += [state[0]]

@@ -6,13 +6,9 @@ import sys
 import string
 import time
 import warnings
-<<<<<<< HEAD:semseg/backbone_val.py
-import numpy as np
-=======
 import math
 import numpy as np
 import json
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
 import torch
 from pathlib import Path
@@ -31,21 +27,10 @@ import torchvision.models as models
 
 from torch.utils.tensorboard import SummaryWriter
 
-<<<<<<< HEAD:semseg/backbone_val.py
-import semseg.models.resnet_divnormei as models_resnet_divnorm
-import utils
-
-random.seed(0)
-np.random.seed(0)
-torch.manual_seed(0)
-=======
 import models.vgg as models_vgg
 import utils
 
-seed = 56
-np.random.seed(seed)
-torch.manual_seed(seed)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -94,8 +79,6 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
-parser.add_argument('--inplanes', default=64, type=int,
-                    help='Number of inplanes (conv1 - ResNet)')
 parser.add_argument('--tensorboard-dir', default='runs', help='path where to save tensorboard')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
@@ -113,8 +96,11 @@ export NCCL_DEBUG=INFO
 export NCCL_DEBUG_SUBSYS=ALL
 export NCCL_IB_DISABLE=1
 export NCCL_P2P_DISABLE=1
-export NCCL_SOCKET_IFNAME=eth0
+export NCCL_SOCKET_IFNAME=lo
 """
+seed = 56
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 
 def generate_rand_string(n):
@@ -133,8 +119,9 @@ def main():
     args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
     print("Experiment dir:", args.checkpoint_dir)
     if args.seed is not None:
-        random.seed(args.seed)
+        # random.seed(args.seed)
         torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         cudnn.deterministic = True
         warnings.warn('You have chosen to seed training. '
                       'This will turn on the CUDNN deterministic setting, '
@@ -213,15 +200,13 @@ def main_worker(gpu, ngpus_per_node, args):
             model = models_vgg.__dict__[args.arch](pretrained=True, num_classes=num_classes)
     else:
         print("=> creating model '{}'".format(args.arch))
-        if "divnorm" in str(args.arch):
-            model_name = str(args.arch)
-            model = models_vgg.__dict__[model_name](pretrained=False, num_classes=num_classes)
-        else:
-            model = models_vgg.__dict__[args.arch](pretrained=False, num_classes=num_classes)
+        model_name = str(args.arch)
+        model = models_vgg.__dict__[args.arch](pretrained=False, num_classes=num_classes)
 
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
     elif args.distributed:
+        print("Distributed data parallel across GPUs")
         # For multiprocessing distributed, DistributedDataParallel constructor
         # should always set the single device scope, otherwise,
         # DistributedDataParallel will use all available devices.
@@ -242,13 +227,16 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.gpu is not None:
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
+        print("Set to GPU", args.gpu)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
             model.features = torch.nn.DataParallel(model.features)
+            print("Dataparallel enabled")
             model.cuda()
         else:
             model = torch.nn.DataParallel(model).cuda()
+            print("Dataparallel enabled")
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
@@ -312,10 +300,11 @@ def main_worker(gpu, ngpus_per_node, args):
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     else:
         train_sampler = None
-
+    print("Creating dataloader..")
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    print("Created dataloader..")
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -327,40 +316,17 @@ def main_worker(gpu, ngpus_per_node, args):
                                 optimizer=optimizer.state_dict())
                     torch.save(state, '%s/checkpoint_%s.pth' % (args.checkpoint_dir, str(args.arch)))
         # train for one epoch
-<<<<<<< HEAD:semseg/backbone_val.py
-        acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer, iterator)
-
-        # remember best acc@1 and save checkpoint
-        is_best = acc1 > best_acc1
-        best_acc1 = max(acc1, best_acc1)
-
-        writer.add_scalar("Train/Best_Acc1", best_acc1, epoch)
-        state = {
-                    'epoch': epoch + 1,
-                    'arch': args.arch,
-                    'state_dict': model.state_dict(),
-                    'best_acc1_train': best_acc1,
-                    'optimizer' : optimizer.state_dict(),
-                }
-        if epoch > (args.epochs - 10):
-            # store only last ten epoch weights
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                    and args.rank % ngpus_per_node == 0):
-                save_checkpoint(state, is_best)
-        else:
-            torch.save(state, "checkpoint_%s.pth" % args.arch)
-
         acc1 = train(train_loader, model, criterion, optimizer, epoch, args, writer=None, iterator=iterator)
         val_acc1, val_acc5 = validate(val_loader, model, criterion, optimizer, epoch, args)
         # remember best acc@1 and save checkpoint
         is_best = val_acc1 > best_acc1
         best_acc1 = max(val_acc1, best_acc1)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
         
         stats = dict(epoch=epoch,
                     lr_weights=optimizer.param_groups[0]['lr'],
                     val_acc1=val_acc1.item())
-        print(json.dumps(stats), file=global_stats_file)
+        if args.rank == 0:
+            print(json.dumps(stats), file=global_stats_file)
 
         # writer.add_scalar("Train/Best_Acc1", best_acc1, epoch)
         state = {
@@ -410,7 +376,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
 
     end = time.time()
 
-    # Creates once at the beginning of training
+        # Creates once at the beginning of training
     scaler = torch.cuda.amp.GradScaler()
 
     for i, (images, target) in enumerate(train_loader):
@@ -429,10 +395,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         with torch.cuda.amp.autocast():
             output = model(images)
             loss = criterion(output, target)
-<<<<<<< HEAD:semseg/backbone_val.py
-            if torch.isnan(loss):
-                print(output.min(), output.max(), target.min(), target.max(), loss)
-=======
             # RELEASE below lines for no nan loss training
             # loss = criterion(output.float(), target)
             
@@ -441,7 +403,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         #     print(output.min(), output.max(), 
         #           target.min(), target.max(), 
         #           loss)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -453,21 +414,26 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         scaler.step(optimizer)
         scaler.update()
         
-<<<<<<< HEAD:semseg/backbone_val.py
-        # if args.rank == 0:
-        #     # Clamping parameters of divnorm to non-negative values
-        #     for p in model.module.backbone.div.parameters():
-        #         if 'conv' in p:
-        #             import ipdb; ipdb.set_trace()
-        #             p.clamp(min=0.)
-=======
         if args.rank == 0:
             # Clamping parameters of divnorm to non-negative values
             if "divnorm" in str(args.arch):
-                div_conv_weight = model.features[2].div.weight.data
-                div_conv_weight = div_conv_weight.clamp(min=0.)
-                model.features[2].div.weight.data = div_conv_weight
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
+                if args.multiprocessing_distributed:
+                    div_conv_weight = model.module.features[2].div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.module.features[2].div.weight.data = div_conv_weight
+                else:
+                    div_conv_weight = model.features[2].div.weight.data
+                    div_conv_weight = div_conv_weight.clamp(min=0.)
+                    model.features[2].div.weight.data = div_conv_weight
+            # if "dalernn" in str(args.arch):
+            #     if args.multiprocessing_distributed:
+            #         div_conv_weight = model.module.features[2].rnn_cell.div.weight.data
+            #         div_conv_weight = div_conv_weight.clamp(min=0.)
+            #         model.module.features[2].rnn_cell.div.weight.data = div_conv_weight
+            #     else:
+            #         div_conv_weight = model.features[2].rnn_cell.div.weight.data
+            #         div_conv_weight = div_conv_weight.clamp(min=0.)
+            #         model.features[2].rnn_cell.div.weight.data = div_conv_weight
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -475,13 +441,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
 
         if i % args.print_freq == 0:
             if args.rank == 0:
-<<<<<<< HEAD:semseg/backbone_val.py
-                progress.display(i)
-
-        writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
-        writer.flush()
-=======
                 stats = dict(epoch=epoch, step=i,
                             lr_weights=optimizer.param_groups[0]['lr'],
                             loss=loss.item(),
@@ -492,7 +451,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, writer, iterat
         # writer.add_scalar("Loss/train", loss.item(), iterator.train_step)
         # writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], iterator.train_step)
         # writer.flush()
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
         iterator.add_train()
     return top1.avg
@@ -518,16 +476,8 @@ def validate(val_loader, model, criterion, optimizer, epoch, args):
             if torch.cuda.is_available():
                 target = target.cuda(args.gpu, non_blocking=True)
 
-<<<<<<< HEAD:semseg/backbone_val.py
-
-            # Casts operations to mixed precision
-            with torch.cuda.amp.autocast():
-                output = model(images)
-                loss = criterion(output, target)
-=======
             output = model(images)
             loss = criterion(output, target)
->>>>>>> 482189db3474500cd64bbb0b0810d9e776fb627b:semseg/backbone_train_vgg.py
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))

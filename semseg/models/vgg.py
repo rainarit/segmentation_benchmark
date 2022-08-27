@@ -4,8 +4,8 @@ import torch.nn as nn
 from models.dale_rnn import DaleRNNLayer
 from .utils import load_state_dict_from_url
 from typing import Union, List, Dict, Any, cast
-from .divisive_norm_exc_inh import *
-from .exc_inh_divisive_norm import *
+from .deprecated.divisive_norm_exc_inh import *
+from .deprecated.exc_inh_divisive_norm import *
 
 __all__ = [
     'VGG', 'vgg9_divnorm', 'vgg9_base', 'vgg9_dalernn_mini',
@@ -82,13 +82,20 @@ def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequ
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+        elif v == 'M1':
+            layers += [nn.MaxPool2d(kernel_size=3,
+                                    stride=2, padding=1)]
         elif v == 'D':
             layers += [DivNormExcInh(in_channels, divnorm_fsize=5)]
         elif v == 'E':
             layers += [ExcInhDivNorm(in_channels, divnorm_fsize=5)]
         elif v == 'R':
-            layers += [DaleRNNLayer(in_channels, in_h=160, in_w=160, 
-                                    hidden_dim=in_channels, divnorm_fsize=5)]
+            layers += [DaleRNNLayer(in_channels, 
+                                    in_channels,
+                                    timesteps=4,
+                                    exc_fsize=9,
+                                    init_='ortho',
+                                    )]
         else:
             v = cast(int, v)
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
@@ -112,7 +119,7 @@ cfgs: Dict[str, List[Union[str, int]]] = {
     'G_mini': [64, 'E', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'], 
     'H': [64, 64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
     #'H': [64, 64, 'M', 256, 'M', 256, 256, 'M', 512, 512, 'M'],
-    'I': [64, 'R', 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
+    'I': [64, 'M', 'R', 128, 'M', 256, 256, 'M', 512, 512, 'M'],
 }
 
 
