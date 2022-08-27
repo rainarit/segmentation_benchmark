@@ -10,6 +10,19 @@ import torch
 import torch.distributed as dist
 
 
+class Iterator():
+    """Class container for processing stuff."""
+
+    train_step = 0
+    eval_step = 0
+
+    def add_train(self):
+        self.train_step+=1
+
+    def add_eval(self):
+        self.eval_step+=1
+
+
 class SmoothedValue:
     """Track a series of values and provide access to smoothed values over a
     window or the global series average.

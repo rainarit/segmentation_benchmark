@@ -6,14 +6,14 @@ python3 -m torch.distributed.launch \
             --master_port 20220 \
             --use_env train.py \
             --lr 0.02 \
-            --data-path "/home/AD/rraina/segmentation_benchmark/benchmark_RELEASE/dataset" \
+            --data-path "/mnt/sphere/projects/VOC_semseg/dataset" \
             --dataset "voc_aug" \
             -b 16 \
             --epochs 50 \
             --divnorm-fsize 3 \
             --arch "deeplabv3" \
             --backbone "resnet50_dalernn" \
-            --output-dir "/home/AD/rraina/segmentation_benchmark/semseg/results/"\
+            --output-dir "/home/vveeraba/src/segmentation_benchmark/semseg/results/"\
             --aux-loss \
             --amp \
 
